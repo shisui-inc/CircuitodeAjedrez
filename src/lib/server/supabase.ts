@@ -2,12 +2,21 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let adminClient: SupabaseClient | null = null;
 
+function getSupabaseUrl() {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+}
+
+export function getSupabaseAdminConfigStatus() {
+  return {
+    hasUrl: Boolean(getSupabaseUrl()),
+    hasAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY),
+    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  };
+}
+
 export function isSupabaseAdminConfigured() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-  );
+  const status = getSupabaseAdminConfigStatus();
+  return status.hasUrl && status.hasServiceRoleKey;
 }
 
 export function getSupabaseAdminClient() {
@@ -17,7 +26,7 @@ export function getSupabaseAdminClient() {
 
   if (!adminClient) {
     adminClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      getSupabaseUrl()!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         auth: {

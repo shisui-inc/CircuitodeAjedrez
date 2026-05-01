@@ -18,7 +18,7 @@ import type {
   Player,
   School,
 } from "@/lib/types";
-import { getSupabaseAdminClient } from "@/lib/server/supabase";
+import { getSupabaseAdminClient, getSupabaseAdminConfigStatus } from "@/lib/server/supabase";
 
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".data");
 const LOCAL_SNAPSHOT_PATH = path.join(LOCAL_DATA_DIR, "circuit-snapshot.json");
@@ -495,11 +495,23 @@ async function getLocalSnapshot(): Promise<CircuitSnapshot> {
 
 async function saveLocalSnapshot(snapshot: CircuitSnapshot) {
   if (!canUseLocalFileStorage()) {
-    throw new Error("Supabase no configurado. El almacenamiento local solo esta disponible en desarrollo.");
+    throw new Error(
+      `Supabase admin no configurado (${formatSupabaseConfigStatus()}). El almacenamiento local solo esta disponible en desarrollo.`,
+    );
   }
 
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
   await writeFile(LOCAL_SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2), "utf8");
+}
+
+function formatSupabaseConfigStatus() {
+  const status = getSupabaseAdminConfigStatus();
+  const missing = [
+    status.hasUrl ? "" : "NEXT_PUBLIC_SUPABASE_URL o SUPABASE_URL",
+    status.hasServiceRoleKey ? "" : "SUPABASE_SERVICE_ROLE_KEY",
+  ].filter(Boolean);
+
+  return missing.length ? `faltan: ${missing.join(", ")}` : "variables presentes, cliente no inicializado";
 }
 
 function applyImportToSnapshot(snapshot: CircuitSnapshot, payload: ImportPayload, actorEmail?: string) {
