@@ -41,10 +41,14 @@ export default async function PublicRankingsPage() {
   const totalPlayersWithPoints = computeIndividualRankings(snapshot).filter((row) => row.totalPoints > 0).length;
 
   return (
-    <main className="min-h-dvh bg-[#f7f3e8] text-slate-950">
-      <section className="relative overflow-hidden border-b-4 border-slate-900 bg-[#f7f3e8]">
+    <main className="relative min-h-dvh overflow-hidden bg-[#eef2f7] text-slate-950">
+      <div
+        className="pointer-events-none fixed inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[length:32px_32px]"
+        aria-hidden="true"
+      />
+      <section className="relative overflow-hidden border-b-4 border-slate-900 bg-[#f8fafc]">
         <div className="absolute inset-y-0 right-0 hidden w-1/2 opacity-70 lg:block" aria-hidden="true">
-          <div className="h-full w-full bg-[linear-gradient(45deg,#1f2937_25%,transparent_25%),linear-gradient(-45deg,#1f2937_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#1f2937_75%),linear-gradient(-45deg,transparent_75%,#1f2937_75%)] bg-[length:72px_72px] bg-[position:0_0,0_36px,36px_-36px,-36px_0] opacity-10" />
+          <div className="h-full w-full bg-[linear-gradient(45deg,#0f172a_25%,transparent_25%),linear-gradient(-45deg,#0f172a_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#0f172a_75%),linear-gradient(-45deg,transparent_75%,#0f172a_75%)] bg-[length:72px_72px] bg-[position:0_0,0_36px,36px_-36px,-36px_0] opacity-[0.055]" />
         </div>
         <div className="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[1fr_360px] lg:px-8 lg:py-8">
           <div className="flex min-h-[430px] flex-col justify-between gap-8">
@@ -94,7 +98,7 @@ export default async function PublicRankingsPage() {
 
           <div className="flex items-end">
             <div className="w-full rounded-lg border-4 border-slate-900 bg-white p-4 shadow-[0_8px_0_#0f172a]">
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border-2 border-slate-900 bg-[#f4f0ff]">
+              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border-2 border-slate-900 bg-[#f6f8fb]">
                 <Image
                   src="/demoniocircuit.png"
                   alt="Logo oficial del Circuito de Ajedrez"
@@ -125,7 +129,7 @@ export default async function PublicRankingsPage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-4 py-8 lg:px-8">
+      <section className="relative mx-auto w-full max-w-7xl px-4 py-8 lg:px-8">
         <div className="mb-5 flex items-center gap-3">
           <Sparkles className="size-5 text-emerald-700" />
           <h2 className="text-2xl font-black tracking-normal">Elegir categoria</h2>
@@ -173,7 +177,7 @@ export default async function PublicRankingsPage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-4 pb-8 lg:px-8">
+      <section className="relative mx-auto w-full max-w-7xl px-4 pb-8 lg:px-8">
         <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-black uppercase tracking-wide text-emerald-800">Cuadro de honor</p>
@@ -190,7 +194,7 @@ export default async function PublicRankingsPage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-4 pb-8 lg:px-8">
+      <section className="relative mx-auto w-full max-w-7xl px-4 pb-8 lg:px-8">
         <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-black uppercase tracking-wide text-lime-800">Colegios destacados</p>
@@ -207,7 +211,7 @@ export default async function PublicRankingsPage() {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 pb-10 lg:px-8">
+      <section className="relative mx-auto grid w-full max-w-7xl gap-6 px-4 pb-10 lg:px-8">
         {sections.map((section) => (
           <RankingSection
             key={section.id}
