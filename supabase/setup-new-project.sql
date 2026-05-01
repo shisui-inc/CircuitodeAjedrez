@@ -206,7 +206,16 @@ on conflict (place) do update set points = excluded.points, updated_at = now();
 insert into public.tournaments (id, name, round, date, status, source_url) values
   ('fecha-1', 'Fecha 1', 1, '2026-03-14', 'pendiente', null),
   ('fecha-2', 'Fecha 2', 2, '2026-04-11', 'pendiente', null),
-  ('fecha-3', 'Fecha 3', 3, '2026-05-09', 'pendiente', null)
+  ('fecha-3', 'Fecha 3', 3, '2026-05-09', 'pendiente', null),
+  ('fecha-4', 'Fecha 4', 4, '2026-06-13', 'pendiente', null),
+  ('fecha-5', 'Fecha 5', 5, '2026-07-11', 'pendiente', null),
+  ('fecha-6', 'Fecha 6', 6, '2026-08-08', 'pendiente', null),
+  ('fecha-7', 'Fecha 7', 7, '2026-09-12', 'pendiente', null),
+  ('fecha-8', 'Fecha 8', 8, '2026-10-10', 'pendiente', null),
+  ('fecha-9', 'Fecha 9', 9, '2026-11-14', 'pendiente', null),
+  ('fecha-10', 'Fecha 10', 10, '2026-12-12', 'pendiente', null),
+  ('fecha-11', 'Fecha 11', 11, '2027-01-09', 'pendiente', null),
+  ('fecha-12', 'Fecha 12', 12, '2027-02-13', 'pendiente', null)
 on conflict (id) do update set
   name = excluded.name,
   round = excluded.round,
