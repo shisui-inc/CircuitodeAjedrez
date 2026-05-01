@@ -71,7 +71,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
       setRows(payload.rows ?? []);
       setWarnings(payload.warnings ?? []);
       setStatusVariant("success");
-      setStatus("Clasificacion leida. Revise la tabla antes de confirmar.");
+      setStatus("Clasificacion leida con ramas sugeridas. Confirme o cambie cada rama antes de guardar.");
     } catch (error) {
       setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo importar la tabla.");
@@ -109,7 +109,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
       setSourceUrl(selectedFile.name);
       setMixedMode(true);
       setStatusVariant("success");
-      setStatus("Archivo leido. Revise la rama de cada jugador antes de confirmar.");
+      setStatus("Archivo leido con ramas sugeridas. Confirme o cambie cada rama antes de guardar.");
     } catch (error) {
       setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo leer el archivo.");
@@ -284,7 +284,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle>Revision de importacion</CardTitle>
-            <CardDescription>Corrija puestos, colegios, jugadores y desempates antes de guardar.</CardDescription>
+            <CardDescription>Confirme o cambie la rama sugerida, y corrija puestos, colegios, jugadores y desempates antes de guardar.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={addRow}>
@@ -303,6 +303,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
                 <p className="text-sm font-semibold">Control de ramas</p>
                 <p className="mt-2 text-3xl font-semibold">{branchPendingCount}</p>
                 <p className="text-sm text-muted-foreground">jugadores pendientes de rama</p>
+                <p className="mt-2 text-xs text-muted-foreground">Las filas detectadas como absoluto o femenino quedan listas para confirmar o cambiar en la tabla.</p>
               </div>
             </div>
           ) : null}

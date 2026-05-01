@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { parseChessResultsXlsx } from "@/lib/chess-results-parser";
-import { normalizeText, similarityRatio } from "@/lib/normalize";
+import { classifyImportRowBranch } from "@/lib/branch-classifier";
 import { hasAdminSession } from "@/lib/server/auth";
 import { getCircuitSnapshot } from "@/lib/server/repository";
 import type { BranchId, ImportRow } from "@/lib/types";
@@ -30,13 +30,15 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await parseChessResultsXlsx(await file.arrayBuffer());
     const snapshot = await getCircuitSnapshot();
-    const rows = parsed.rows.map((row) => assignBranch(row, snapshot.players));
+    const rows = parsed.rows.map((row) => classifyImportRowBranch(row, snapshot.players));
     const pendingBranches = rows.filter((row) => !isBranch(row.branchId)).length;
+    const branchSummary = getBranchSummary(rows);
 
     return Response.json({
       rows,
       warnings: [
         ...parsed.warnings,
+        `Ramas sugeridas: ${branchSummary.absoluto} absoluto, ${branchSummary.femenino} femenino. Revise y cambie lo necesario antes de confirmar.`,
         pendingBranches
           ? `${pendingBranches} jugadores necesitan asignacion manual de rama antes de confirmar.`
           : "",
@@ -51,32 +53,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function assignBranch(row: ImportRow, players: Awaited<ReturnType<typeof getCircuitSnapshot>>["players"]): ImportRow {
-  const normalized = normalizeText(row.playerName);
-  const exact = players.find((player) => player.normalizedName === normalized && player.branchId);
-
-  if (exact?.branchId) {
-    return { ...row, branchId: exact.branchId };
-  }
-
-  const similar = players
-    .map((player) => ({
-      player,
-      ratio: similarityRatio(player.fullName, row.playerName),
-    }))
-    .filter(({ player, ratio }) => ratio >= 0.9 && player.branchId)
-    .sort((a, b) => b.ratio - a.ratio)[0];
-
-  return {
-    ...row,
-    branchId: similar?.player.branchId ?? "pendiente",
-    warnings: [
-      ...row.warnings,
-      similar ? `Rama sugerida por nombre parecido: ${similar.player.fullName}.` : "Rama no detectada.",
-    ],
-  };
-}
-
 function isBranch(value: ImportRow["branchId"]): value is BranchId {
   return value === "absoluto" || value === "femenino";
+}
+
+function getBranchSummary(rows: ImportRow[]) {
+  return rows.reduce(
+    (summary, row) => {
+      if (row.branchId === "absoluto" || row.branchId === "femenino") {
+        summary[row.branchId] += 1;
+      }
+
+      return summary;
+    },
+    { absoluto: 0, femenino: 0 },
+  );
 }
