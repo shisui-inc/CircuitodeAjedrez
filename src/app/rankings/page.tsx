@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeIndividualRankings, computeSchoolRankings } from "@/lib/rankings";
 import { getCircuitSnapshot } from "@/lib/server/repository";
+import { SOFTWARE_VERSION } from "@/lib/software-version";
 import type { Branch, Category, CircuitDate, IndividualRankingRow, SchoolRankingRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -69,12 +70,15 @@ export default async function PublicRankingsPage() {
                   <p className="text-xs font-semibold text-slate-600">del Circuito de Ajedrez Paranaense 2026</p>
                 </div>
               </div>
-              <Button asChild variant="outline" className="border-2 border-slate-900 bg-white font-bold shadow-[0_3px_0_#0f172a]">
-                <Link href="/login">
-                  Admin
-                  <ChevronRight className="size-4" />
-                </Link>
-              </Button>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <Button asChild variant="outline" className="border-2 border-slate-900 bg-white font-bold shadow-[0_3px_0_#0f172a]">
+                  <Link href="/login">
+                    Admin
+                    <ChevronRight className="size-4" />
+                  </Link>
+                </Button>
+                <p className="text-right text-[11px] font-bold text-slate-500">Software versión: {SOFTWARE_VERSION}</p>
+              </div>
             </nav>
 
             <div className="max-w-3xl">
