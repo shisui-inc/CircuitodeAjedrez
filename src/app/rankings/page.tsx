@@ -61,8 +61,8 @@ export default async function PublicRankingsPage() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm font-black uppercase tracking-wide text-emerald-800">Circuito Escolar</p>
-                  <p className="text-xs font-semibold text-slate-600">Ajedrez Paranaense 2026</p>
+                  <p className="text-sm font-black uppercase tracking-wide text-emerald-800">Shofware oficial</p>
+                  <p className="text-xs font-semibold text-slate-600">del Circuito de Ajedrez Paranaense 2026</p>
                 </div>
               </div>
               <Button asChild variant="outline" className="border-2 border-slate-900 bg-white font-bold shadow-[0_3px_0_#0f172a]">
@@ -96,23 +96,23 @@ export default async function PublicRankingsPage() {
             <div className="w-full rounded-lg border-4 border-slate-900 bg-white p-4 shadow-[0_8px_0_#0f172a]">
               <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border-2 border-slate-900 bg-[#f4f0ff]">
                 <Image
-                  src="/logoflash.png"
-                  alt="Circuito Escolar de Ajedrez"
+                  src="/demoniocircuit.png"
+                  alt="Logo oficial del Circuito de Ajedrez"
                   width={420}
                   height={420}
-                  className="h-full w-full object-contain p-3"
+                  className="h-full w-full object-contain p-4"
                   priority
                 />
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black uppercase text-slate-500">Circuito Escolar</p>
-                  <p className="text-xl font-black">Rankings oficiales</p>
+                  <p className="text-sm font-black uppercase text-slate-500">Logo oficial del circuito</p>
+                  <p className="text-xl font-black">Circuito de Ajedrez</p>
                 </div>
                 <div className="flex size-16 items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-white text-[0px] shadow-[0_4px_0_#0f172a]">
                   <Image
-                    src="/logoflash.png"
-                    alt="Circuito Escolar de Ajedrez"
+                    src="/demoniocircuit.png"
+                    alt="Logo oficial del Circuito de Ajedrez"
                     width={88}
                     height={88}
                     className="h-16 w-16 object-contain"
