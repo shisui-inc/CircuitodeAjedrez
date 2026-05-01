@@ -65,7 +65,7 @@ export default async function PublicRankingsPage() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm font-black uppercase tracking-wide text-emerald-800">Shofware oficial</p>
+                  <p className="text-sm font-black uppercase tracking-wide text-emerald-800">Software oficial</p>
                   <p className="text-xs font-semibold text-slate-600">del Circuito de Ajedrez Paranaense 2026</p>
                 </div>
               </div>

@@ -101,7 +101,7 @@ function NavList({ pathname, onLogout }: { pathname: string; onLogout: () => voi
             />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight">Shofware oficial</p>
+            <p className="text-sm font-semibold leading-tight">Software oficial</p>
             <p className="text-xs text-muted-foreground">del Circuito de Ajedrez Paranaense</p>
           </div>
         </div>
