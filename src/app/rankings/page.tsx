@@ -94,20 +94,29 @@ export default async function PublicRankingsPage() {
 
           <div className="flex items-end">
             <div className="w-full rounded-lg border-4 border-slate-900 bg-white p-4 shadow-[0_8px_0_#0f172a]">
-              <div className="grid aspect-square grid-cols-8 overflow-hidden rounded-md border-2 border-slate-900">
-                {Array.from({ length: 64 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className={(Math.floor(index / 8) + index) % 2 === 0 ? "bg-emerald-200" : "bg-slate-800"}
-                  />
-                ))}
+              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md border-2 border-slate-900 bg-[#f4f0ff]">
+                <Image
+                  src="/logoflash.png"
+                  alt="Circuito Escolar de Ajedrez"
+                  width={420}
+                  height={420}
+                  className="h-full w-full object-contain p-3"
+                  priority
+                />
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black uppercase text-slate-500">Tablero publico</p>
-                  <p className="text-xl font-black">Resultados por division</p>
+                  <p className="text-sm font-black uppercase text-slate-500">Circuito Escolar</p>
+                  <p className="text-xl font-black">Rankings oficiales</p>
                 </div>
-                <div className="flex size-14 items-center justify-center rounded-lg border-2 border-slate-900 bg-pink-300 text-3xl shadow-[0_4px_0_#0f172a]">
+                <div className="flex size-16 items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-white text-[0px] shadow-[0_4px_0_#0f172a]">
+                  <Image
+                    src="/logoflash.png"
+                    alt="Circuito Escolar de Ajedrez"
+                    width={88}
+                    height={88}
+                    className="h-16 w-16 object-contain"
+                  />
                   ♛
                 </div>
               </div>
