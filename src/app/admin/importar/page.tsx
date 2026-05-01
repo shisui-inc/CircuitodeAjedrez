@@ -1,5 +1,4 @@
 import { ImportWizard } from "@/components/import-wizard";
-import { getDemoImportRows } from "@/lib/chess-results-parser";
 import { getCircuitSnapshot } from "@/lib/server/repository";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +18,7 @@ export default async function ImportPage() {
         dates={snapshot.dates}
         categories={snapshot.categories}
         branches={snapshot.branches}
-        initialRows={getDemoImportRows()}
+        initialRows={[]}
       />
     </div>
   );

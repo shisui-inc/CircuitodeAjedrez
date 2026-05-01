@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Plus, Trash2, Upload, Wand2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileSpreadsheet, Plus, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,7 @@ interface ImportWizardProps {
 }
 
 export function ImportWizard({ dates, categories, branches, initialRows }: ImportWizardProps) {
-  const [sourceUrl, setSourceUrl] = useState("https://chess-results.com/demo");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [tournamentId, setTournamentId] = useState(dates[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState<CategoryId>(categories[0]?.id ?? "sub-6");
   const [branchId, setBranchId] = useState<BranchId>(branches[0]?.id ?? "absoluto");
@@ -259,10 +259,6 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
             <CardDescription>Corrija puestos, colegios, jugadores y desempates antes de guardar.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setRows(initialRows)}>
-              <Wand2 className="size-4" />
-              Filas demo
-            </Button>
             <Button variant="outline" onClick={addRow}>
               <Plus className="size-4" />
               Agregar fila

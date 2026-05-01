@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarDays,
   ClipboardCheck,
+  FilePenLine,
   FileDown,
   Globe2,
   LayoutDashboard,
@@ -27,6 +28,7 @@ const navigation = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/importar", label: "Importar Chess-Results", icon: Upload },
   { href: "/admin/revision", label: "Revision de importacion", icon: ClipboardCheck },
+  { href: "/admin/correcciones", label: "Correcciones", icon: FilePenLine },
   { href: "/admin/fechas", label: "Fechas", icon: CalendarDays },
   { href: "/admin/jugadores", label: "Jugadores", icon: Users },
   { href: "/admin/colegios", label: "Colegios", icon: School },

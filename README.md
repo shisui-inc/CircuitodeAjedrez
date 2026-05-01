@@ -44,7 +44,8 @@ npm run dev
 
 1. Crear un proyecto en Supabase.
 2. En SQL Editor, ejecutar `supabase/schema.sql`.
-3. Para datos de prueba, ejecutar `supabase/seed.sql`.
+3. Para dejar la configuracion inicial sin jugadores ni resultados, ejecutar `supabase/seed.sql`.
+4. Si necesita borrar cargas anteriores y empezar de cero, ejecutar `supabase/reset-data.sql`.
 4. Crear un usuario administrador en Supabase Auth.
 5. Copiar las credenciales a `.env.local`:
 
@@ -85,6 +86,7 @@ Al confirmar, se guardan `imported_results`, se crean jugadores/colegios nuevos,
 - Dashboard
 - Importar Chess-Results
 - Revision de importacion
+- Correcciones
 - Fechas
 - Jugadores
 - Colegios

@@ -314,6 +314,123 @@ export async function updatePointRules(rules: Array<{ place: number; points: num
   };
 }
 
+export async function correctImportedResult(
+  payload: {
+    resultId: string;
+    place: number | null;
+    playerName: string;
+    schoolName: string;
+    tournamentPoints: number;
+    tieBreaks: Record<string, number | string>;
+  },
+  actorEmail?: string,
+) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!payload.resultId || !payload.playerName.trim() || !payload.schoolName.trim()) {
+    throw new Error("Complete jugador, colegio y resultado.");
+  }
+
+  if (!supabase) {
+    const snapshot = await getLocalSnapshot();
+    const result = snapshot.importedResults.find((item) => item.id === payload.resultId);
+
+    if (!result) {
+      throw new Error("Resultado no encontrado.");
+    }
+
+    const school = getOrCreateLocalSchool(snapshot, payload.schoolName);
+    const player = getOrCreateLocalPlayer(snapshot, payload.playerName, school.id, result.branchId);
+
+    result.place = payload.place;
+    result.playerId = player.id;
+    result.schoolId = school.id;
+    result.playerName = player.fullName;
+    result.schoolName = school.officialName;
+    result.tournamentPoints = payload.tournamentPoints;
+    result.tieBreaks = payload.tieBreaks;
+    result.needsReview = false;
+
+    snapshot.auditLogs = [
+      {
+        id: `audit-${randomUUID()}`,
+        action: "imported_result.corrected",
+        entityType: "imported_results",
+        entityId: result.id,
+        actorEmail: actorEmail ?? "admin",
+        summary: `Resultado corregido: ${result.playerName}.`,
+        createdAt: new Date().toISOString(),
+        metadata: { resultId: result.id },
+      },
+      ...snapshot.auditLogs,
+    ];
+
+    await saveLocalSnapshot(snapshot);
+    return { mode: "local" as const, message: "Resultado corregido." };
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("imported_results")
+    .select("id,tournament_id,category_id,branch_id")
+    .eq("id", payload.resultId)
+    .single();
+
+  if (existingError || !existing) {
+    throw new Error(existingError?.message ?? "Resultado no encontrado.");
+  }
+
+  const school = await getOrCreateSchool(payload.schoolName);
+  const player = await getOrCreatePlayer(payload.playerName, school.id);
+
+  const { error: updateError } = await supabase
+    .from("imported_results")
+    .update({
+      place: payload.place,
+      player_id: player.id,
+      school_id: school.id,
+      player_name_snapshot: player.full_name,
+      school_name_snapshot: school.official_name,
+      tournament_points: payload.tournamentPoints,
+      tie_breaks: payload.tieBreaks,
+      needs_review: false,
+    })
+    .eq("id", payload.resultId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  await supabase.from("circuit_points").delete().eq("imported_result_id", payload.resultId);
+
+  if (payload.place && payload.place >= 1 && payload.place <= 10) {
+    const { error: pointsError } = await supabase.from("circuit_points").insert({
+      imported_result_id: payload.resultId,
+      tournament_id: existing.tournament_id,
+      category_id: existing.category_id,
+      branch_id: existing.branch_id,
+      player_id: player.id,
+      school_id: school.id,
+      place: payload.place,
+      points: getCircuitPoints(payload.place, DEFAULT_POINT_RULES),
+    });
+
+    if (pointsError) {
+      throw new Error(pointsError.message);
+    }
+  }
+
+  await supabase.from("audit_logs").insert({
+    action: "imported_result.corrected",
+    entity_type: "imported_results",
+    entity_id: payload.resultId,
+    actor_email: actorEmail ?? "admin",
+    summary: `Resultado corregido: ${player.full_name}.`,
+    metadata: { resultId: payload.resultId },
+  });
+
+  return { mode: "supabase" as const, message: "Resultado corregido." };
+}
+
 export async function confirmMixedImport(
   payload: Omit<ImportPayload, "branchId">,
   actorEmail?: string,

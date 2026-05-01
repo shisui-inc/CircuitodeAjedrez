@@ -1,24 +1,24 @@
-import { ImportWizard } from "@/components/import-wizard";
+import { CorrectionsPanel } from "@/components/corrections-panel";
 import { getCircuitSnapshot } from "@/lib/server/repository";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewPage() {
+export default async function CorrectionsPage() {
   const snapshot = await getCircuitSnapshot();
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-normal">Revision de importacion</h2>
+        <h2 className="text-2xl font-semibold tracking-normal">Correcciones</h2>
         <p className="text-sm text-muted-foreground">
-          Pantalla de control manual para completar colegios, puestos y nombres parecidos antes de guardar.
+          Use esta seccion para arreglar una carga confirmada sin volver a importar toda la tabla.
         </p>
       </div>
-      <ImportWizard
+      <CorrectionsPanel
         dates={snapshot.dates}
         categories={snapshot.categories}
         branches={snapshot.branches}
-        initialRows={[]}
+        results={snapshot.importedResults}
       />
     </div>
   );
