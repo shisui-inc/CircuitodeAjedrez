@@ -23,6 +23,10 @@ import { getSupabaseAdminClient } from "@/lib/server/supabase";
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".data");
 const LOCAL_SNAPSHOT_PATH = path.join(LOCAL_DATA_DIR, "circuit-snapshot.json");
 
+function canUseLocalFileStorage() {
+  return !process.env.VERCEL && process.env.NODE_ENV !== "production";
+}
+
 interface SchoolRow {
   id: string;
   official_name: string;
@@ -128,7 +132,8 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
   ].find(Boolean);
 
   if (firstError) {
-    throw new Error(firstError.message);
+    console.error("[repository] Supabase snapshot query failed", firstError);
+    return structuredClone(demoSnapshot);
   }
 
   return {
@@ -349,6 +354,10 @@ export async function confirmMixedImport(
 }
 
 async function getLocalSnapshot(): Promise<CircuitSnapshot> {
+  if (!canUseLocalFileStorage()) {
+    return structuredClone(demoSnapshot);
+  }
+
   try {
     const raw = await readFile(LOCAL_SNAPSHOT_PATH, "utf8");
     return JSON.parse(raw) as CircuitSnapshot;
@@ -360,6 +369,10 @@ async function getLocalSnapshot(): Promise<CircuitSnapshot> {
 }
 
 async function saveLocalSnapshot(snapshot: CircuitSnapshot) {
+  if (!canUseLocalFileStorage()) {
+    throw new Error("Supabase no configurado. El almacenamiento local solo esta disponible en desarrollo.");
+  }
+
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
   await writeFile(LOCAL_SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2), "utf8");
 }
