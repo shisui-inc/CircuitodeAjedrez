@@ -106,8 +106,8 @@ export default async function PublicRankingsPage() {
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black uppercase text-slate-500">Logo oficial del circuito</p>
-                  <p className="text-xl font-black">Circuito de Ajedrez</p>
+                  <p className="text-sm font-black uppercase text-slate-500">X Circuito de Ajedrez Escolar</p>
+                  <p className="text-xl font-black">Paranaense PAR 2026</p>
                 </div>
                 <div className="flex size-16 items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-white text-[0px] shadow-[0_4px_0_#0f172a]">
                   <Image
