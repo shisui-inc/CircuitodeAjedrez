@@ -43,6 +43,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
   const [rows, setRows] = useState<ImportRow[]>(initialRows);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [status, setStatus] = useState("");
+  const [statusVariant, setStatusVariant] = useState<"success" | "error" | "info">("info");
   const [isParsing, setIsParsing] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const issues = useMemo(() => validateImportRows(rows), [rows]);
@@ -53,6 +54,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
   async function parseSource() {
     setIsParsing(true);
     setStatus("");
+    setStatusVariant("info");
 
     try {
       const response = await fetch("/api/import/parse", {
@@ -60,7 +62,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sourceUrl }),
       });
-      const payload = (await response.json()) as { rows?: ImportRow[]; warnings?: string[]; error?: string };
+      const payload = await readResponse<{ rows?: ImportRow[]; warnings?: string[]; error?: string }>(response);
 
       if (!response.ok) {
         throw new Error(payload.error ?? "No se pudo importar la tabla.");
@@ -68,8 +70,10 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
 
       setRows(payload.rows ?? []);
       setWarnings(payload.warnings ?? []);
+      setStatusVariant("success");
       setStatus("Clasificacion leida. Revise la tabla antes de confirmar.");
     } catch (error) {
+      setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo importar la tabla.");
     } finally {
       setIsParsing(false);
@@ -84,6 +88,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
 
     setIsParsing(true);
     setStatus("");
+    setStatusVariant("info");
 
     try {
       const formData = new FormData();
@@ -93,7 +98,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
         method: "POST",
         body: formData,
       });
-      const payload = (await response.json()) as { rows?: ImportRow[]; warnings?: string[]; error?: string };
+      const payload = await readResponse<{ rows?: ImportRow[]; warnings?: string[]; error?: string }>(response);
 
       if (!response.ok) {
         throw new Error(payload.error ?? "No se pudo leer el archivo.");
@@ -103,8 +108,10 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
       setWarnings(payload.warnings ?? []);
       setSourceUrl(selectedFile.name);
       setMixedMode(true);
+      setStatusVariant("success");
       setStatus("Archivo leido. Revise la rama de cada jugador antes de confirmar.");
     } catch (error) {
+      setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo leer el archivo.");
     } finally {
       setIsParsing(false);
@@ -112,8 +119,27 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
   }
 
   async function confirmRows() {
+    if (!rows.length) {
+      setStatusVariant("error");
+      setStatus("No hay filas para confirmar.");
+      return;
+    }
+
+    if (mixedMode && branchPendingCount > 0) {
+      setStatusVariant("error");
+      setStatus("Asigne rama a todos los jugadores antes de confirmar.");
+      return;
+    }
+
+    if (blockingIssues.length > 0) {
+      setStatusVariant("error");
+      setStatus("Corrija los errores antes de confirmar.");
+      return;
+    }
+
     setIsConfirming(true);
-    setStatus("");
+    setStatusVariant("info");
+    setStatus("Guardando carga...");
 
     try {
       const response = await fetch(mixedMode ? "/api/import/confirm-mixed" : "/api/import/confirm", {
@@ -121,14 +147,16 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
         headers: { "content-type": "application/json" },
         body: JSON.stringify(mixedMode ? { sourceUrl, tournamentId, categoryId, rows } : { sourceUrl, tournamentId, categoryId, branchId, rows }),
       });
-      const payload = (await response.json()) as { message?: string; error?: string };
+      const payload = await readResponse<{ message?: string; savedRows?: number; error?: string }>(response);
 
       if (!response.ok) {
         throw new Error(payload.error ?? "No se pudo confirmar la carga.");
       }
 
-      setStatus(payload.message ?? "Carga confirmada.");
+      setStatusVariant("success");
+      setStatus(`${payload.message ?? "Carga confirmada."} Filas guardadas: ${payload.savedRows ?? rows.length}.`);
     } catch (error) {
+      setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo confirmar la carga.");
     } finally {
       setIsConfirming(false);
@@ -383,7 +411,7 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
               Confirmar carga
             </Button>
           </div>
-          {status ? <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{status}</p> : null}
+          {status ? <p className={statusClassName(statusVariant)}>{status}</p> : null}
         </CardContent>
       </Card>
     </div>
@@ -482,4 +510,30 @@ function textToTieBreaks(value: string) {
         return [key?.trim() || `Desempate ${index + 1}`, rest.join(":").trim()];
       }),
   );
+}
+
+async function readResponse<T extends { error?: string }>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  if (!text) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return { error: text.slice(0, 300) } as T;
+  }
+}
+
+function statusClassName(variant: "success" | "error" | "info") {
+  if (variant === "error") {
+    return "rounded-md bg-red-50 p-3 text-sm text-red-800";
+  }
+
+  if (variant === "success") {
+    return "rounded-md bg-emerald-50 p-3 text-sm text-emerald-800";
+  }
+
+  return "rounded-md bg-sky-50 p-3 text-sm text-sky-800";
 }
