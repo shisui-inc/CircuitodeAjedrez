@@ -47,7 +47,7 @@ export default async function PublicRankingsPage() {
         aria-hidden="true"
       />
       <section className="relative overflow-hidden border-b-4 border-slate-900 bg-[#f8fafc]">
-        <div className="absolute inset-y-0 right-0 hidden w-1/2 opacity-70 lg:block" aria-hidden="true">
+        <div className="absolute inset-0 opacity-70" aria-hidden="true">
           <div className="h-full w-full bg-[linear-gradient(45deg,#0f172a_25%,transparent_25%),linear-gradient(-45deg,#0f172a_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#0f172a_75%),linear-gradient(-45deg,transparent_75%,#0f172a_75%)] bg-[length:72px_72px] bg-[position:0_0,0_36px,36px_-36px,-36px_0] opacity-[0.055]" />
         </div>
         <div className="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-6 lg:grid-cols-[1fr_360px] lg:px-8 lg:py-8">
