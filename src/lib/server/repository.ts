@@ -439,6 +439,88 @@ export async function correctImportedResult(
   return { mode: "supabase" as const, message: "Resultado corregido." };
 }
 
+export async function deleteImportedDate(tournamentId: string, actorEmail?: string) {
+  if (!tournamentId) {
+    throw new Error("Seleccione una fecha valida.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const snapshot = await getLocalSnapshot();
+    const deletedResults = snapshot.importedResults.filter((result) => result.tournamentId === tournamentId).length;
+
+    snapshot.importedResults = snapshot.importedResults.filter((result) => result.tournamentId !== tournamentId);
+    snapshot.dates = snapshot.dates.map((date) =>
+      date.id === tournamentId ? { ...date, status: "pendiente" as const, sourceUrl: undefined } : date,
+    );
+    snapshot.auditLogs = [
+      {
+        id: `audit-${randomUUID()}`,
+        action: "date_import.deleted",
+        entityType: "tournaments",
+        entityId: tournamentId,
+        actorEmail: actorEmail ?? "admin",
+        summary: `Datos cargados de la fecha eliminados: ${deletedResults} resultados.`,
+        createdAt: new Date().toISOString(),
+        metadata: { tournamentId, deletedResults },
+      },
+      ...snapshot.auditLogs,
+    ];
+
+    await saveLocalSnapshot(snapshot);
+
+    return {
+      mode: "local" as const,
+      deletedResults,
+      message: `Datos de la fecha eliminados: ${deletedResults} resultados.`,
+    };
+  }
+
+  const { count: deletedResults, error: countError } = await supabase
+    .from("imported_results")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId);
+
+  if (countError) {
+    throw new Error(countError.message);
+  }
+
+  const { error: pointsError } = await supabase.from("circuit_points").delete().eq("tournament_id", tournamentId);
+  if (pointsError) {
+    throw new Error(pointsError.message);
+  }
+
+  const { error: resultsError } = await supabase.from("imported_results").delete().eq("tournament_id", tournamentId);
+  if (resultsError) {
+    throw new Error(resultsError.message);
+  }
+
+  const { error: tournamentError } = await supabase
+    .from("tournaments")
+    .update({ status: "pendiente", source_url: null })
+    .eq("id", tournamentId);
+
+  if (tournamentError) {
+    throw new Error(tournamentError.message);
+  }
+
+  await supabase.from("audit_logs").insert({
+    action: "date_import.deleted",
+    entity_type: "tournaments",
+    entity_id: tournamentId,
+    actor_email: actorEmail ?? "admin",
+    summary: `Datos cargados de la fecha eliminados: ${deletedResults ?? 0} resultados.`,
+    metadata: { tournamentId, deletedResults: deletedResults ?? 0 },
+  });
+
+  return {
+    mode: "supabase" as const,
+    deletedResults: deletedResults ?? 0,
+    message: `Datos de la fecha eliminados: ${deletedResults ?? 0} resultados.`,
+  };
+}
+
 export async function confirmMixedImport(
   payload: Omit<ImportPayload, "branchId">,
   actorEmail?: string,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,8 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
     })),
   );
   const [savingId, setSavingId] = useState("");
+  const [deletingDate, setDeletingDate] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [status, setStatus] = useState("");
 
   const dateById = useMemo(() => new Map(dates.map((date) => [date.id, date])), [dates]);
@@ -67,6 +69,8 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
     .filter((row) => selectedCategory === "all" || row.categoryId === selectedCategory)
     .filter((row) => selectedBranch === "all" || row.branchId === selectedBranch)
     .sort((a, b) => (a.place ?? 9999) - (b.place ?? 9999));
+  const selectedDateRows = rows.filter((row) => row.tournamentId === selectedDate);
+  const canDeleteSelectedDate = selectedDate !== "all" && selectedDateRows.length > 0 && deleteConfirmation === "BORRAR";
 
   function updateRow(id: string, patch: Partial<EditableResult>) {
     setRows((currentRows) => currentRows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -94,6 +98,38 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
       setStatus(error instanceof Error ? error.message : "No se pudo guardar la correccion.");
     } finally {
       setSavingId("");
+    }
+  }
+
+  async function deleteSelectedDate() {
+    if (!canDeleteSelectedDate) {
+      setStatus("Seleccione una fecha con datos y escriba BORRAR para confirmar.");
+      return;
+    }
+
+    setDeletingDate(true);
+    setStatus("");
+
+    try {
+      const response = await fetch("/api/correcciones/fecha", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tournamentId: selectedDate, confirmation: deleteConfirmation }),
+      });
+      const payload = (await response.json()) as { message?: string; error?: string; deletedResults?: number };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "No se pudieron borrar los datos de la fecha.");
+      }
+
+      setRows((currentRows) => currentRows.filter((row) => row.tournamentId !== selectedDate));
+      setDeleteConfirmation("");
+      setStatus(payload.message ?? `Datos de la fecha eliminados: ${payload.deletedResults ?? 0} resultados.`);
+      router.refresh();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "No se pudieron borrar los datos de la fecha.");
+    } finally {
+      setDeletingDate(false);
     }
   }
 
@@ -156,6 +192,43 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
             </Select>
           </div>
         </div>
+
+        {selectedDate !== "all" ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-red-900">Borrar datos cargados de la fecha</p>
+                <p className="text-sm text-red-800">
+                  Esto elimina {selectedDateRows.length} resultados y sus puntos del circuito para{" "}
+                  {dateById.get(selectedDate)?.name ?? selectedDate}. No borra jugadores ni colegios.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[180px_auto]">
+                <div className="space-y-2">
+                  <Label htmlFor="delete-date-confirmation" className="text-red-900">
+                    Escriba BORRAR
+                  </Label>
+                  <Input
+                    id="delete-date-confirmation"
+                    value={deleteConfirmation}
+                    onChange={(event) => setDeleteConfirmation(event.target.value)}
+                    disabled={deletingDate || selectedDateRows.length === 0}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="self-end"
+                  onClick={deleteSelectedDate}
+                  disabled={deletingDate || !canDeleteSelectedDate}
+                >
+                  <Trash2 className="size-4" />
+                  Borrar fecha
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {status ? <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{status}</p> : null}
 
