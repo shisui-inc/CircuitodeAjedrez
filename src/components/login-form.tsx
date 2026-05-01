@@ -45,15 +45,23 @@ export function LoginForm() {
     }
   }
 
-  async function loginDemo() {
+  async function loginWithAdminPassword(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/demo-login", { method: "POST" });
+      const response = await fetch("/api/auth/demo-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+
       if (!response.ok) {
         const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? "No se pudo iniciar el modo demo.");
+        throw new Error(payload.error ?? "No se pudo iniciar sesion.");
       }
 
       router.push(next);
@@ -105,17 +113,30 @@ export function LoginForm() {
                 Ingresar con Supabase
               </Button>
             </form>
-            <Button type="button" variant="outline" className="w-full" onClick={loginDemo} disabled={loading}>
-              Probar con datos demo
+            <Button type="button" variant="outline" className="w-full" onClick={() => loginWithAdminPassword()} disabled={loading}>
+              Entrar con contrasena admin
             </Button>
           </>
         ) : (
           <>
+            <form className="space-y-4" onSubmit={loginWithAdminPassword}>
+              <div className="space-y-2">
+                <Label htmlFor="admin-password">Contrasena</Label>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  disabled={loading}
+                  autoComplete="current-password"
+                />
+              </div>
             {error ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-            <Button type="button" className="w-full" onClick={loginDemo} disabled={loading}>
-              <LogIn className="size-4" />
-              Entrar al panel
-            </Button>
+              <Button type="submit" className="w-full" disabled={loading}>
+                <LogIn className="size-4" />
+                Entrar al panel
+              </Button>
+            </form>
           </>
         )}
       </CardContent>
