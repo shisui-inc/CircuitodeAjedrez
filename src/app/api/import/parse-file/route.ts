@@ -19,21 +19,36 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Suba un archivo .xlsx exportado de Chess-Results." }, { status: 400 });
   }
 
-  const parsed = await parseChessResultsXlsx(await file.arrayBuffer());
-  const snapshot = await getCircuitSnapshot();
-  const rows = parsed.rows.map((row) => assignBranch(row, snapshot.players));
-  const pendingBranches = rows.filter((row) => !isBranch(row.branchId)).length;
+  if (!file.name.toLowerCase().endsWith(".xlsx")) {
+    return Response.json({ error: "El archivo debe ser .xlsx." }, { status: 400 });
+  }
 
-  return Response.json({
-    rows,
-    warnings: [
-      ...parsed.warnings,
-      pendingBranches
-        ? `${pendingBranches} jugadores necesitan asignacion manual de rama antes de confirmar.`
-        : "",
-    ].filter(Boolean),
-    fileName: file.name,
-  });
+  if (file.size > 8 * 1024 * 1024) {
+    return Response.json({ error: "El archivo es demasiado grande. Maximo 8 MB." }, { status: 413 });
+  }
+
+  try {
+    const parsed = await parseChessResultsXlsx(await file.arrayBuffer());
+    const snapshot = await getCircuitSnapshot();
+    const rows = parsed.rows.map((row) => assignBranch(row, snapshot.players));
+    const pendingBranches = rows.filter((row) => !isBranch(row.branchId)).length;
+
+    return Response.json({
+      rows,
+      warnings: [
+        ...parsed.warnings,
+        pendingBranches
+          ? `${pendingBranches} jugadores necesitan asignacion manual de rama antes de confirmar.`
+          : "",
+      ].filter(Boolean),
+      fileName: file.name,
+    });
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "No se pudo leer el archivo." },
+      { status: 400 },
+    );
+  }
 }
 
 function assignBranch(row: ImportRow, players: Awaited<ReturnType<typeof getCircuitSnapshot>>["players"]): ImportRow {

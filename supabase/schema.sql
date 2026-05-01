@@ -45,11 +45,15 @@ create table if not exists public.players (
   full_name text not null,
   normalized_name text not null,
   school_id uuid not null references public.schools(id),
+  branch_id text references public.branches(id),
   birth_year integer,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (normalized_name, school_id)
 );
+
+alter table public.players
+  add column if not exists branch_id text references public.branches(id);
 
 create table if not exists public.imported_results (
   id uuid primary key default gen_random_uuid(),

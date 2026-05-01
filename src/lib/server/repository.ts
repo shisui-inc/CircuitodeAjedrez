@@ -40,6 +40,7 @@ interface PlayerRow {
   full_name: string;
   normalized_name: string;
   school_id: string;
+  branch_id: Branch["id"] | null;
   birth_year: number | null;
 }
 
@@ -105,7 +106,7 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
       .from("schools")
       .select("id,official_name,normalized_name,city,school_aliases(alias)")
       .order("official_name"),
-    supabase.from("players").select("id,full_name,normalized_name,school_id,birth_year").order("full_name"),
+    supabase.from("players").select("id,full_name,normalized_name,school_id,branch_id,birth_year").order("full_name"),
     supabase
       .from("imported_results")
       .select(
@@ -186,7 +187,7 @@ export async function confirmImport(payload: ImportPayload, actorEmail?: string)
 
   for (const row of payload.rows) {
     const school = await getOrCreateSchool(row.schoolName || "Colegio pendiente");
-    const player = await getOrCreatePlayer(row.playerName, school.id);
+    const player = await getOrCreatePlayer(row.playerName, school.id, payload.branchId);
 
     resultRows.push({
       ...scope,
@@ -318,6 +319,7 @@ export async function correctImportedResult(
   payload: {
     resultId: string;
     place: number | null;
+    branchId: Branch["id"];
     playerName: string;
     schoolName: string;
     tournamentPoints: number;
@@ -327,8 +329,12 @@ export async function correctImportedResult(
 ) {
   const supabase = getSupabaseAdminClient();
 
-  if (!payload.resultId || !payload.playerName.trim() || !payload.schoolName.trim()) {
-    throw new Error("Complete jugador, colegio y resultado.");
+  if (!payload.resultId || !payload.playerName.trim() || !payload.schoolName.trim() || !payload.branchId) {
+    throw new Error("Complete jugador, colegio, rama y resultado.");
+  }
+
+  if (payload.place !== null && payload.place <= 0) {
+    throw new Error("El puesto debe ser mayor a cero.");
   }
 
   if (!supabase) {
@@ -340,9 +346,10 @@ export async function correctImportedResult(
     }
 
     const school = getOrCreateLocalSchool(snapshot, payload.schoolName);
-    const player = getOrCreateLocalPlayer(snapshot, payload.playerName, school.id, result.branchId);
+    const player = getOrCreateLocalPlayer(snapshot, payload.playerName, school.id, payload.branchId);
 
     result.place = payload.place;
+    result.branchId = payload.branchId;
     result.playerId = player.id;
     result.schoolId = school.id;
     result.playerName = player.fullName;
@@ -380,12 +387,13 @@ export async function correctImportedResult(
   }
 
   const school = await getOrCreateSchool(payload.schoolName);
-  const player = await getOrCreatePlayer(payload.playerName, school.id);
+  const player = await getOrCreatePlayer(payload.playerName, school.id, payload.branchId);
 
   const { error: updateError } = await supabase
     .from("imported_results")
     .update({
       place: payload.place,
+      branch_id: payload.branchId,
       player_id: player.id,
       school_id: school.id,
       player_name_snapshot: player.full_name,
@@ -407,7 +415,7 @@ export async function correctImportedResult(
       imported_result_id: payload.resultId,
       tournament_id: existing.tournament_id,
       category_id: existing.category_id,
-      branch_id: existing.branch_id,
+      branch_id: payload.branchId,
       player_id: player.id,
       school_id: school.id,
       place: payload.place,
@@ -642,7 +650,7 @@ async function getOrCreateSchool(officialName: string) {
   return data as { id: string; official_name: string; normalized_name: string };
 }
 
-async function getOrCreatePlayer(fullName: string, schoolId: string) {
+async function getOrCreatePlayer(fullName: string, schoolId: string, branchId?: Branch["id"]) {
   const supabase = getSupabaseAdminClient();
   if (!supabase) {
     throw new Error("Supabase no configurado.");
@@ -655,6 +663,7 @@ async function getOrCreatePlayer(fullName: string, schoolId: string) {
         full_name: fullName.trim(),
         normalized_name: normalizeText(fullName),
         school_id: schoolId,
+        ...(branchId ? { branch_id: branchId } : {}),
       },
       { onConflict: "normalized_name,school_id" },
     )
@@ -713,6 +722,7 @@ function mapPlayer(row: PlayerRow): Player {
     fullName: row.full_name,
     normalizedName: row.normalized_name,
     schoolId: row.school_id,
+    branchId: row.branch_id ?? undefined,
     birthYear: row.birth_year ?? undefined,
   };
 }

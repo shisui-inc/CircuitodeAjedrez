@@ -61,7 +61,6 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
 
   const dateById = useMemo(() => new Map(dates.map((date) => [date.id, date])), [dates]);
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
-  const branchById = useMemo(() => new Map(branches.map((branch) => [branch.id, branch])), [branches]);
 
   const visibleRows = rows
     .filter((row) => selectedDate === "all" || row.tournamentId === selectedDate)
@@ -164,8 +163,9 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Contexto</TableHead>
-                <TableHead className="w-24">Puesto</TableHead>
+                  <TableHead>Contexto</TableHead>
+                  <TableHead className="w-36">Rama</TableHead>
+                  <TableHead className="w-24">Puesto</TableHead>
                 <TableHead className="min-w-56">Jugador</TableHead>
                 <TableHead className="min-w-56">Colegio</TableHead>
                 <TableHead className="w-28">Puntos</TableHead>
@@ -181,9 +181,22 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
                       <span className="font-medium">{dateById.get(row.tournamentId)?.name ?? row.tournamentId}</span>
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="secondary">{categoryById.get(row.categoryId)?.name ?? row.categoryId}</Badge>
-                        <Badge variant="secondary">{branchById.get(row.branchId)?.name ?? row.branchId}</Badge>
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Select value={row.branchId} onValueChange={(value) => updateRow(row.id, { branchId: value as EditableResult["branchId"] })}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <Input
@@ -228,7 +241,7 @@ export function CorrectionsPanel({ dates, categories, branches, results }: Corre
               ))}
               {!visibleRows.length ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                     Todavia no hay resultados cargados para corregir.
                   </TableCell>
                 </TableRow>

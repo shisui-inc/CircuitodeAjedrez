@@ -13,16 +13,22 @@ export async function POST(request: NextRequest) {
     const payload = (await request.json()) as {
       resultId?: string;
       place?: number | null;
+      branchId?: "absoluto" | "femenino";
       playerName?: string;
       schoolName?: string;
       tournamentPoints?: number;
       tieBreaks?: Record<string, number | string>;
     };
 
+    if (payload.branchId !== "absoluto" && payload.branchId !== "femenino") {
+      return Response.json({ error: "Seleccione una rama valida." }, { status: 422 });
+    }
+
     const result = await correctImportedResult(
       {
         resultId: payload.resultId ?? "",
         place: payload.place ?? null,
+        branchId: payload.branchId,
         playerName: payload.playerName ?? "",
         schoolName: payload.schoolName ?? "",
         tournamentPoints: Number(payload.tournamentPoints ?? 0),

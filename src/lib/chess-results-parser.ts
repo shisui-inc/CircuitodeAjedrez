@@ -184,16 +184,6 @@ function parseMatrix(matrix: string[][]) {
   };
 }
 
-export function getDemoImportRows(): ImportRow[] {
-  return [
-    demoImportRow(1, "Mateo Silva", "Col. San Jose", 5, { Buch: 18, SB: 14 }),
-    demoImportRow(2, "Diego Acosta", "Colegio Nacional Parana", 4.5, { Buch: 17, SB: 12 }),
-    demoImportRow(3, "Lucia Benitez", "Del Sol", 4, { Buch: 16, SB: 11 }),
-    demoImportRow(4, "Bruno Gomez", "", 3.5, { Buch: 15, SB: 9 }),
-    demoImportRow(5, "Valentina Meza", "Municipal de Ajedrez", 3, { Buch: 14, SB: 8 }),
-  ];
-}
-
 function mapRowsFromHeader(
   dataRows: string[][],
   headers: string[],
@@ -423,28 +413,4 @@ function sheetXmlToMatrix(xml: string, sharedStrings: string[]) {
 function columnRefToIndex(ref: string) {
   const letters = ref.match(/[A-Z]+/)?.[0] ?? "A";
   return letters.split("").reduce((sum, letter) => sum * 26 + letter.charCodeAt(0) - 64, 0) - 1;
-}
-
-function demoImportRow(
-  place: number,
-  playerName: string,
-  schoolName: string,
-  tournamentPoints: number,
-  tieBreaks: Record<string, number>,
-): ImportRow {
-  return {
-    tempId: `demo-${place}`,
-    place,
-    playerName,
-    schoolName,
-    tournamentPoints,
-    tieBreaks,
-    raw: {},
-    detected: {
-      place: true,
-      player: true,
-      school: Boolean(schoolName),
-    },
-    warnings: schoolName ? [] : [`Colegio no detectado para ${playerName}.`],
-  };
 }

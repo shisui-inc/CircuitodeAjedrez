@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getDemoImportRows, parseChessResultsHtml } from "@/lib/chess-results-parser";
+import { parseChessResultsHtml } from "@/lib/chess-results-parser";
 import { normalizeText, similarityRatio } from "@/lib/normalize";
 import { hasAdminSession } from "@/lib/server/auth";
 import { getCircuitSnapshot } from "@/lib/server/repository";
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
     const parsed = parseChessResultsHtml(html);
 
     if (!parsed.rows.length) {
-      return Response.json({
-        rows: getDemoImportRows(),
-        warnings: [
-          ...parsed.warnings,
-          "Se cargaron filas demo para probar la pantalla de revision.",
-        ],
-        fallback: true,
-      });
+      return Response.json(
+        {
+          rows: [],
+          warnings: parsed.warnings,
+          error: "No se pudo detectar una tabla de clasificacion en el link.",
+        },
+        { status: 422 },
+      );
     }
 
     const snapshot = await getCircuitSnapshot();
@@ -66,14 +66,14 @@ export async function POST(request: NextRequest) {
       fallback: false,
     });
   } catch (error) {
-    return Response.json({
-      rows: getDemoImportRows(),
-      warnings: [
-        error instanceof Error ? error.message : "No se pudo leer el link.",
-        "Se cargaron filas demo para probar la pantalla de revision.",
-      ],
-      fallback: true,
-    });
+    return Response.json(
+      {
+        rows: [],
+        warnings: [],
+        error: error instanceof Error ? error.message : "No se pudo leer el link.",
+      },
+      { status: 502 },
+    );
   }
 }
 
