@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight, Crown, Medal, School, Shield, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,8 +50,15 @@ export default async function PublicRankingsPage() {
           <div className="flex min-h-[430px] flex-col justify-between gap-8">
             <nav className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex size-12 items-center justify-center rounded-lg border-2 border-slate-900 bg-emerald-500 text-2xl font-black text-white shadow-[0_4px_0_#0f172a]">
-                  ♞
+                <div className="flex size-16 items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-white shadow-[0_4px_0_#0f172a]">
+                  <Image
+                    src="/logoflash.png"
+                    alt="Circuito Escolar de Ajedrez"
+                    width={88}
+                    height={88}
+                    className="h-16 w-16 object-contain"
+                    priority
+                  />
                 </div>
                 <div>
                   <p className="text-sm font-black uppercase tracking-wide text-emerald-800">Circuito Escolar</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -89,8 +90,15 @@ function NavList({ pathname, onLogout }: { pathname: string; onLogout: () => voi
     <div className="flex min-h-full flex-col">
       <div className="px-5 py-5">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-emerald-700 text-white">
-            <Trophy className="size-5" />
+          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white">
+            <Image
+              src="/logoflash.png"
+              alt="Circuito Escolar de Ajedrez"
+              width={72}
+              height={72}
+              className="h-14 w-14 object-contain"
+              priority
+            />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-tight">Circuito Escolar</p>
