@@ -20,7 +20,7 @@ const categoryAccent = [
   "border-cyan-200 bg-cyan-50 text-cyan-950 shadow-cyan-200/70",
 ];
 
-const PUBLIC_MAINTENANCE_MODE = true;
+const PUBLIC_MAINTENANCE_MODE = false;
 
 export default async function PublicRankingsPage() {
   if (PUBLIC_MAINTENANCE_MODE) {
