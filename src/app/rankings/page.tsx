@@ -20,7 +20,13 @@ const categoryAccent = [
   "border-cyan-200 bg-cyan-50 text-cyan-950 shadow-cyan-200/70",
 ];
 
+const PUBLIC_MAINTENANCE_MODE = true;
+
 export default async function PublicRankingsPage() {
+  if (PUBLIC_MAINTENANCE_MODE) {
+    return <MaintenancePage />;
+  }
+
   const snapshot = await getCircuitSnapshot();
   const schoolRows = computeSchoolRankings(snapshot);
   const dates = snapshot.dates.sort((a, b) => a.round - b.round);
@@ -241,6 +247,75 @@ export default async function PublicRankingsPage() {
           />
         ))}
         <SchoolSection rows={schoolRows} dates={dates} />
+      </section>
+    </main>
+  );
+}
+
+function MaintenancePage() {
+  return (
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#eef2f7] px-4 py-8 text-slate-950">
+      <div
+        className="pointer-events-none fixed inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.055)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.055)_1px,transparent_1px)] bg-[length:32px_32px]"
+        aria-hidden="true"
+      />
+      <section className="relative grid w-full max-w-5xl gap-6 rounded-lg border-4 border-slate-900 bg-white p-5 shadow-[0_10px_0_#0f172a] md:grid-cols-[1fr_340px] md:p-8">
+        <div className="flex min-h-[420px] flex-col justify-between gap-8">
+          <nav className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-16 items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-white shadow-[0_4px_0_#0f172a]">
+                <Image
+                  src="/logoflash.png"
+                  alt="Circuito Escolar de Ajedrez"
+                  width={88}
+                  height={88}
+                  className="h-16 w-16 object-contain"
+                  priority
+                />
+              </div>
+              <div>
+                <p className="text-sm font-black uppercase text-emerald-800">Circuito Escolar</p>
+                <p className="text-xs font-semibold text-slate-600">Rankings en revision</p>
+              </div>
+            </div>
+            <Button asChild variant="outline" className="border-2 border-slate-900 bg-white font-bold shadow-[0_3px_0_#0f172a]">
+              <Link href="/login">
+                Admin
+                <ChevronRight className="size-4" />
+              </Link>
+            </Button>
+          </nav>
+
+          <div>
+            <Badge className="mb-4 border-2 border-slate-900 bg-amber-300 px-3 py-1 text-slate-950 shadow-[0_3px_0_#0f172a]">
+              Actualizacion de datos
+            </Badge>
+            <h1 className="text-5xl font-black leading-none tracking-normal sm:text-6xl lg:text-7xl">
+              EN MANTENIMIENTO
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg font-semibold text-slate-700">
+              Estamos revisando y recargando los resultados del circuito. Los rankings publicos volveran a estar disponibles cuando termine la auditoria.
+            </p>
+          </div>
+
+          <div className="rounded-lg border-2 border-slate-900 bg-emerald-50 p-4 shadow-[0_4px_0_#0f172a]">
+            <p className="text-sm font-black uppercase text-emerald-800">Software version: {SOFTWARE_VERSION}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-700">Panel administrativo activo para correcciones y recarga.</p>
+          </div>
+        </div>
+
+        <div className="flex items-center">
+          <div className="w-full overflow-hidden rounded-lg border-4 border-slate-900 bg-[#f6f8fb] shadow-[0_7px_0_#0f172a]">
+            <Image
+              src="/peonparaariba.png"
+              alt="Pieza de ajedrez indicando mantenimiento"
+              width={420}
+              height={420}
+              className="aspect-square h-full w-full object-cover"
+              priority
+            />
+          </div>
+        </div>
       </section>
     </main>
   );
