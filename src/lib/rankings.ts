@@ -1,4 +1,5 @@
 import { getCircuitPoints } from "@/lib/circuit";
+import { normalizeText } from "@/lib/normalize";
 import type {
   CircuitPoint,
   CircuitSnapshot,
@@ -60,7 +61,8 @@ export function computeIndividualRankings(
       continue;
     }
 
-    const rowKey = `${result.playerId}-${categoryFilter}-${branchFilter}`;
+    const playerKey = normalizeText(player.fullName) || result.playerId;
+    const rowKey = `${playerKey}-${categoryFilter}-${branchFilter}`;
     const current =
       grouped.get(rowKey) ??
       ({
@@ -97,11 +99,24 @@ export function computeIndividualRankings(
       current.bestPlace = current.bestPlace ? Math.min(current.bestPlace, result.place) : result.place;
     }
 
+    const currentDateRound = dateById.get(result.tournamentId)?.round ?? 0;
+    const displayedDateRound = getDisplayedSchoolRound(current.pointsByDate, dateById);
+    if (currentDateRound >= displayedDateRound) {
+      current.playerId = result.playerId;
+      current.playerName = player.fullName;
+      current.schoolId = result.schoolId;
+      current.schoolName = school.officialName;
+    }
+
     grouped.set(rowKey, current);
   }
 
   for (const row of grouped.values()) {
-    const playerResults = scopedResults.filter((result) => result.playerId === row.playerId);
+    const playerName = normalizeText(playerById.get(row.playerId)?.fullName ?? row.playerName);
+    const playerResults = scopedResults.filter((result) => {
+      const player = playerById.get(result.playerId);
+      return normalizeText(player?.fullName ?? result.playerName) === playerName;
+    });
     row.datesPlayed = new Set(playerResults.map((result) => result.tournamentId)).size;
     row.recentBestPlace = getRecentBestPlace(playerResults, dateById);
   }
@@ -239,4 +254,11 @@ function getRecentBestPlace(
   });
 
   return sorted.find((result) => result.place !== null)?.place ?? null;
+}
+
+function getDisplayedSchoolRound(pointsByDate: Record<string, number>, dateById: Map<string, { round: number }>) {
+  return Object.keys(pointsByDate).reduce((latest, tournamentId) => {
+    const round = dateById.get(tournamentId)?.round ?? 0;
+    return Math.max(latest, round);
+  }, 0);
 }

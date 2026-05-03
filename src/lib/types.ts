@@ -108,6 +108,7 @@ export interface CircuitSnapshot {
   schools: School[];
   players: Player[];
   importedResults: ImportedResult[];
+  circuitPoints?: CircuitPoint[];
   pointRules: PointRule[];
   auditLogs: AuditLog[];
 }

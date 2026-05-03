@@ -78,6 +78,45 @@ describe("rankings", () => {
     expect(rows[0].totalPoints).toBeGreaterThan(0);
     expect(rows[0].playersWithPoints).toBeGreaterThan(1);
   });
+
+  it("agrupa el ranking individual por nombre aunque el jugador tenga ids distintos", () => {
+    const snapshot: CircuitSnapshot = {
+      ...rankingSnapshot,
+      schools: [
+        ...rankingSnapshot.schools,
+        {
+          id: "school-nuevo",
+          officialName: "Colegio Nuevo",
+          normalizedName: "colegio nuevo",
+          aliases: [],
+        },
+      ],
+      players: [
+        ...rankingSnapshot.players,
+        {
+          id: "player-mateo-duplicado",
+          fullName: "Mateo Silva",
+          normalizedName: "mateo silva",
+          schoolId: "school-nuevo",
+        },
+      ],
+      importedResults: [
+        ...rankingSnapshot.importedResults,
+        result("r6", "fecha-3", "player-mateo-duplicado", "school-nuevo", "Mateo Silva", "Colegio Nuevo", 1),
+      ],
+    };
+
+    const rows = computeIndividualRankings(snapshot, {
+      categoryId: "sub-10",
+      branchId: "absoluto",
+    });
+    const mateoRows = rows.filter((row) => row.playerName === "Mateo Silva");
+
+    expect(mateoRows).toHaveLength(1);
+    expect(mateoRows[0].totalPoints).toBe(35);
+    expect(mateoRows[0].datesPlayed).toBe(3);
+    expect(mateoRows[0].schoolName).toBe("Colegio Nuevo");
+  });
 });
 
 describe("validateImportRows", () => {

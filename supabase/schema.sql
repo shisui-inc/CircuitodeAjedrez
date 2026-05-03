@@ -55,6 +55,9 @@ create table if not exists public.players (
 alter table public.players
   add column if not exists branch_id text references public.branches(id);
 
+alter table public.players
+  add column if not exists birth_year integer;
+
 create table if not exists public.imported_results (
   id uuid primary key default gen_random_uuid(),
   tournament_id text not null references public.tournaments(id) on delete cascade,
@@ -76,6 +79,36 @@ create table if not exists public.imported_results (
   unique (tournament_id, category_id, branch_id, player_id)
 );
 
+alter table public.imported_results
+  add column if not exists tournament_points numeric(6,2) not null default 0,
+  add column if not exists tie_breaks jsonb not null default '{}'::jsonb,
+  add column if not exists source_url text,
+  add column if not exists raw_row jsonb not null default '{}'::jsonb,
+  add column if not exists needs_review boolean not null default false;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'imported_results_scope_place_unique'
+      and conrelid = 'public.imported_results'::regclass
+  ) then
+    alter table public.imported_results
+      add constraint imported_results_scope_place_unique
+      unique (tournament_id, category_id, branch_id, place);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'imported_results_scope_player_unique'
+      and conrelid = 'public.imported_results'::regclass
+  ) then
+    alter table public.imported_results
+      add constraint imported_results_scope_player_unique
+      unique (tournament_id, category_id, branch_id, player_id);
+  end if;
+end $$;
+
 create table if not exists public.point_rules (
   place smallint primary key check (place between 1 and 10),
   points smallint not null check (points >= 0),
@@ -94,6 +127,19 @@ create table if not exists public.circuit_points (
   points smallint not null check (points >= 0),
   awarded_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'circuit_points_imported_result_unique'
+      and conrelid = 'public.circuit_points'::regclass
+  ) then
+    alter table public.circuit_points
+      add constraint circuit_points_imported_result_unique
+      unique (imported_result_id);
+  end if;
+end $$;
 
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
@@ -155,6 +201,28 @@ alter table public.imported_results enable row level security;
 alter table public.point_rules enable row level security;
 alter table public.circuit_points enable row level security;
 alter table public.audit_logs enable row level security;
+
+drop policy if exists "public read categories" on public.categories;
+drop policy if exists "public read branches" on public.branches;
+drop policy if exists "public read tournaments" on public.tournaments;
+drop policy if exists "public read schools" on public.schools;
+drop policy if exists "public read school aliases" on public.school_aliases;
+drop policy if exists "public read players" on public.players;
+drop policy if exists "public read imported results" on public.imported_results;
+drop policy if exists "public read point rules" on public.point_rules;
+drop policy if exists "public read circuit points" on public.circuit_points;
+
+drop policy if exists "authenticated write categories" on public.categories;
+drop policy if exists "authenticated write branches" on public.branches;
+drop policy if exists "authenticated write tournaments" on public.tournaments;
+drop policy if exists "authenticated write schools" on public.schools;
+drop policy if exists "authenticated write school aliases" on public.school_aliases;
+drop policy if exists "authenticated write players" on public.players;
+drop policy if exists "authenticated write imported results" on public.imported_results;
+drop policy if exists "authenticated write point rules" on public.point_rules;
+drop policy if exists "authenticated write circuit points" on public.circuit_points;
+drop policy if exists "authenticated read audit logs" on public.audit_logs;
+drop policy if exists "authenticated insert audit logs" on public.audit_logs;
 
 create policy "public read categories" on public.categories for select using (true);
 create policy "public read branches" on public.branches for select using (true);

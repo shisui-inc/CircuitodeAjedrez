@@ -33,6 +33,4 @@ insert into public.tournaments (id, name, round, date, status, source_url) value
 on conflict (id) do update set
   name = excluded.name,
   round = excluded.round,
-  date = excluded.date,
-  status = excluded.status,
-  source_url = excluded.source_url;
+  date = excluded.date;

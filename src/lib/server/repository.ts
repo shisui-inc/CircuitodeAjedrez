@@ -71,6 +71,18 @@ interface ImportedResultRow {
   needs_review: boolean | null;
 }
 
+interface CircuitPointRow {
+  id: string;
+  imported_result_id: string;
+  tournament_id: string;
+  category_id: Category["id"];
+  branch_id: Branch["id"];
+  player_id: string;
+  school_id: string;
+  place: number;
+  points: number;
+}
+
 interface AuditRow {
   id: string;
   action: string;
@@ -96,6 +108,7 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
     schoolsResponse,
     playersResponse,
     resultsResponse,
+    circuitPointsResponse,
     pointRulesResponse,
     auditResponse,
   ] = await Promise.all([
@@ -113,6 +126,10 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
         "id,tournament_id,category_id,branch_id,place,player_id,school_id,player_name_snapshot,school_name_snapshot,tournament_points,tie_breaks,source_url,raw_row,created_at,needs_review",
       )
       .order("place"),
+    supabase
+      .from("circuit_points")
+      .select("id,imported_result_id,tournament_id,category_id,branch_id,player_id,school_id,place,points")
+      .order("tournament_id"),
     supabase.from("point_rules").select("place,points").order("place"),
     supabase
       .from("audit_logs")
@@ -128,6 +145,7 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
     schoolsResponse.error,
     playersResponse.error,
     resultsResponse.error,
+    circuitPointsResponse.error,
     pointRulesResponse.error,
     auditResponse.error,
   ].find(Boolean);
@@ -154,6 +172,7 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
     schools: ((schoolsResponse.data ?? []) as SchoolRow[]).map(mapSchool),
     players: ((playersResponse.data ?? []) as PlayerRow[]).map(mapPlayer),
     importedResults: ((resultsResponse.data ?? []) as ImportedResultRow[]).map(mapImportedResult),
+    circuitPoints: ((circuitPointsResponse.data ?? []) as CircuitPointRow[]).map(mapCircuitPoint),
     pointRules: pointRulesResponse.data?.length ? pointRulesResponse.data : DEFAULT_POINT_RULES,
     auditLogs: ((auditResponse.data ?? []) as AuditRow[]).map(mapAuditLog),
   };
@@ -244,12 +263,15 @@ export async function confirmImport(payload: ImportPayload, actorEmail?: string)
     }
   }
 
-  await supabase
+  const { error: tournamentUpdateError } = await supabase
     .from("tournaments")
     .update({ status: "importada", source_url: payload.sourceUrl })
     .eq("id", payload.tournamentId);
+  if (tournamentUpdateError) {
+    throw new Error(tournamentUpdateError.message);
+  }
 
-  await supabase.from("audit_logs").insert({
+  const { error: auditError } = await supabase.from("audit_logs").insert({
     action: "import.confirmed",
     entity_type: "imported_results",
     actor_email: actorEmail ?? "admin",
@@ -261,6 +283,9 @@ export async function confirmImport(payload: ImportPayload, actorEmail?: string)
       sourceUrl: payload.sourceUrl,
     },
   });
+  if (auditError) {
+    throw new Error(auditError.message);
+  }
 
   return {
     mode: "supabase" as const,
@@ -305,19 +330,26 @@ export async function updatePointRules(rules: Array<{ place: number; points: num
     throw new Error(error.message);
   }
 
-  await Promise.all(
+  const updateResponses = await Promise.all(
     normalizedRules.map((rule) =>
       supabase.from("circuit_points").update({ points: rule.points }).eq("place", rule.place),
     ),
   );
+  const updateError = updateResponses.find((response) => response.error)?.error;
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
 
-  await supabase.from("audit_logs").insert({
+  const { error: auditError } = await supabase.from("audit_logs").insert({
     action: "point_rules.updated",
     entity_type: "point_rules",
     actor_email: actorEmail ?? "admin",
     summary: "Reglas de puntos actualizadas.",
     metadata: { rules: normalizedRules },
   });
+  if (auditError) {
+    throw new Error(auditError.message);
+  }
 
   return {
     mode: "supabase" as const,
@@ -418,7 +450,13 @@ export async function correctImportedResult(
     throw new Error(updateError.message);
   }
 
-  await supabase.from("circuit_points").delete().eq("imported_result_id", payload.resultId);
+  const { error: pointsDeleteError } = await supabase
+    .from("circuit_points")
+    .delete()
+    .eq("imported_result_id", payload.resultId);
+  if (pointsDeleteError) {
+    throw new Error(pointsDeleteError.message);
+  }
 
   if (payload.place && payload.place >= 1 && payload.place <= 10) {
     const { error: pointsError } = await supabase.from("circuit_points").insert({
@@ -437,7 +475,7 @@ export async function correctImportedResult(
     }
   }
 
-  await supabase.from("audit_logs").insert({
+  const { error: auditError } = await supabase.from("audit_logs").insert({
     action: "imported_result.corrected",
     entity_type: "imported_results",
     entity_id: payload.resultId,
@@ -445,6 +483,9 @@ export async function correctImportedResult(
     summary: `Resultado corregido: ${player.full_name}.`,
     metadata: { resultId: payload.resultId },
   });
+  if (auditError) {
+    throw new Error(auditError.message);
+  }
 
   return { mode: "supabase" as const, message: "Resultado corregido." };
 }
@@ -515,7 +556,7 @@ export async function deleteImportedDate(tournamentId: string, actorEmail?: stri
     throw new Error(tournamentError.message);
   }
 
-  await supabase.from("audit_logs").insert({
+  const { error: auditError } = await supabase.from("audit_logs").insert({
     action: "date_import.deleted",
     entity_type: "tournaments",
     entity_id: tournamentId,
@@ -523,12 +564,196 @@ export async function deleteImportedDate(tournamentId: string, actorEmail?: stri
     summary: `Datos cargados de la fecha eliminados: ${deletedResults ?? 0} resultados.`,
     metadata: { tournamentId, deletedResults: deletedResults ?? 0 },
   });
+  if (auditError) {
+    throw new Error(auditError.message);
+  }
 
   return {
     mode: "supabase" as const,
     deletedResults: deletedResults ?? 0,
     message: `Datos de la fecha eliminados: ${deletedResults ?? 0} resultados.`,
   };
+}
+
+export async function mergePlayers(
+  payload: {
+    sourcePlayerId: string;
+    targetPlayerId: string;
+  },
+  actorEmail?: string,
+) {
+  if (!payload.sourcePlayerId || !payload.targetPlayerId || payload.sourcePlayerId === payload.targetPlayerId) {
+    throw new Error("Seleccione dos jugadores distintos para fusionar.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const snapshot = await getLocalSnapshot();
+    const source = snapshot.players.find((player) => player.id === payload.sourcePlayerId);
+    const target = snapshot.players.find((player) => player.id === payload.targetPlayerId);
+
+    if (!source || !target) {
+      throw new Error("Jugador origen o destino no encontrado.");
+    }
+
+    assertNoLocalMergeConflicts(snapshot, payload.sourcePlayerId, payload.targetPlayerId);
+
+    let movedResults = 0;
+    for (const result of snapshot.importedResults) {
+      if (result.playerId === payload.sourcePlayerId) {
+        result.playerId = payload.targetPlayerId;
+        movedResults += 1;
+      }
+    }
+
+    snapshot.players = snapshot.players.filter((player) => player.id !== payload.sourcePlayerId);
+    snapshot.auditLogs = [
+      {
+        id: `audit-${randomUUID()}`,
+        action: "player.merged",
+        entityType: "players",
+        entityId: payload.targetPlayerId,
+        actorEmail: actorEmail ?? "admin",
+        summary: `Jugador fusionado: ${source.fullName} -> ${target.fullName}.`,
+        createdAt: new Date().toISOString(),
+        metadata: { sourcePlayerId: source.id, targetPlayerId: target.id, movedResults },
+      },
+      ...snapshot.auditLogs,
+    ];
+    await saveLocalSnapshot(snapshot);
+
+    return {
+      mode: "local" as const,
+      movedResults,
+      message: `Jugador fusionado. Resultados movidos: ${movedResults}.`,
+    };
+  }
+
+  const { data: players, error: playersError } = await supabase
+    .from("players")
+    .select("id,full_name")
+    .in("id", [payload.sourcePlayerId, payload.targetPlayerId]);
+
+  if (playersError) {
+    throw new Error(playersError.message);
+  }
+
+  const source = players?.find((player) => player.id === payload.sourcePlayerId);
+  const target = players?.find((player) => player.id === payload.targetPlayerId);
+  if (!source || !target) {
+    throw new Error("Jugador origen o destino no encontrado.");
+  }
+
+  const { data: scopedResults, error: scopedResultsError } = await supabase
+    .from("imported_results")
+    .select("id,tournament_id,category_id,branch_id,player_id")
+    .in("player_id", [payload.sourcePlayerId, payload.targetPlayerId]);
+
+  if (scopedResultsError) {
+    throw new Error(scopedResultsError.message);
+  }
+
+  const conflicts = findMergeConflicts(
+    (scopedResults ?? []).map((result) => ({
+      id: result.id,
+      tournamentId: result.tournament_id,
+      categoryId: result.category_id,
+      branchId: result.branch_id,
+      playerId: result.player_id,
+    })),
+    payload.sourcePlayerId,
+    payload.targetPlayerId,
+  );
+
+  if (conflicts.length) {
+    throw new Error(`No se puede fusionar: ambos jugadores tienen resultados en ${conflicts.join(", ")}.`);
+  }
+
+  const movedResults = (scopedResults ?? []).filter((result) => result.player_id === payload.sourcePlayerId).length;
+
+  const { error: moveResultsError } = await supabase
+    .from("imported_results")
+    .update({ player_id: payload.targetPlayerId })
+    .eq("player_id", payload.sourcePlayerId);
+
+  if (moveResultsError) {
+    throw new Error(moveResultsError.message);
+  }
+
+  const { error: movePointsError } = await supabase
+    .from("circuit_points")
+    .update({ player_id: payload.targetPlayerId })
+    .eq("player_id", payload.sourcePlayerId);
+
+  if (movePointsError) {
+    throw new Error(movePointsError.message);
+  }
+
+  const { error: deleteError } = await supabase.from("players").delete().eq("id", payload.sourcePlayerId);
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  const { error: auditError } = await supabase.from("audit_logs").insert({
+    action: "player.merged",
+    entity_type: "players",
+    entity_id: payload.targetPlayerId,
+    actor_email: actorEmail ?? "admin",
+    summary: `Jugador fusionado: ${source.full_name} -> ${target.full_name}.`,
+    metadata: {
+      sourcePlayerId: source.id,
+      targetPlayerId: target.id,
+      movedResults,
+    },
+  });
+
+  if (auditError) {
+    throw new Error(auditError.message);
+  }
+
+  return {
+    mode: "supabase" as const,
+    movedResults,
+    message: `Jugador fusionado. Resultados movidos: ${movedResults}.`,
+  };
+}
+
+function assertNoLocalMergeConflicts(snapshot: CircuitSnapshot, sourcePlayerId: string, targetPlayerId: string) {
+  const scopedResults = snapshot.importedResults
+    .filter((result) => result.playerId === sourcePlayerId || result.playerId === targetPlayerId)
+    .map((result) => ({
+      id: result.id,
+      tournamentId: result.tournamentId,
+      categoryId: result.categoryId,
+      branchId: result.branchId,
+      playerId: result.playerId,
+    }));
+  const conflicts = findMergeConflicts(scopedResults, sourcePlayerId, targetPlayerId);
+
+  if (conflicts.length) {
+    throw new Error(`No se puede fusionar: ambos jugadores tienen resultados en ${conflicts.join(", ")}.`);
+  }
+}
+
+function findMergeConflicts(
+  results: Array<{ id: string; tournamentId: string; categoryId: string; branchId: string; playerId: string }>,
+  sourcePlayerId: string,
+  targetPlayerId: string,
+) {
+  const sourceScopes = new Set(
+    results
+      .filter((result) => result.playerId === sourcePlayerId)
+      .map((result) => `${result.tournamentId}/${result.categoryId}/${result.branchId}`),
+  );
+  return Array.from(
+    new Set(
+      results
+        .filter((result) => result.playerId === targetPlayerId)
+        .map((result) => `${result.tournamentId}/${result.categoryId}/${result.branchId}`)
+        .filter((scope) => sourceScopes.has(scope)),
+    ),
+  );
 }
 
 async function countExistingResults(tournamentId: string, categoryId: Category["id"], branchId: Branch["id"]) {
@@ -792,12 +1017,44 @@ async function getOrCreatePlayer(fullName: string, schoolId: string, branchId?: 
     throw new Error("Supabase no configurado.");
   }
 
+  const normalizedName = normalizeText(fullName);
+  const { data: existingPlayers, error: existingError } = await supabase
+    .from("players")
+    .select("id,full_name,school_id")
+    .eq("normalized_name", normalizedName);
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const existingPlayer =
+    existingPlayers?.find((player) => player.school_id === schoolId) ?? existingPlayers?.[0];
+
+  if (existingPlayer) {
+    const { data, error } = await supabase
+      .from("players")
+      .update({
+        full_name: fullName.trim(),
+        school_id: schoolId,
+        ...(branchId ? { branch_id: branchId } : {}),
+      })
+      .eq("id", existingPlayer.id)
+      .select("id,full_name")
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data as { id: string; full_name: string };
+  }
+
   const { data, error } = await supabase
     .from("players")
     .upsert(
       {
         full_name: fullName.trim(),
-        normalized_name: normalizeText(fullName),
+        normalized_name: normalizedName,
         school_id: schoolId,
         ...(branchId ? { branch_id: branchId } : {}),
       },
@@ -821,7 +1078,7 @@ async function upsertSchoolAlias(schoolId: string, alias: string) {
     return;
   }
 
-  await supabase.from("school_aliases").upsert(
+  const { error } = await supabase.from("school_aliases").upsert(
     {
       school_id: schoolId,
       alias: alias.trim(),
@@ -829,6 +1086,9 @@ async function upsertSchoolAlias(schoolId: string, alias: string) {
     },
     { onConflict: "normalized_alias" },
   );
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 function mapTournament(row: TournamentRow): CircuitDate {
@@ -880,6 +1140,20 @@ function mapImportedResult(row: ImportedResultRow): ImportedResult {
     rawRow: row.raw_row ?? {},
     importedAt: row.created_at,
     needsReview: Boolean(row.needs_review),
+  };
+}
+
+function mapCircuitPoint(row: CircuitPointRow) {
+  return {
+    id: row.id,
+    importedResultId: row.imported_result_id,
+    tournamentId: row.tournament_id,
+    categoryId: row.category_id,
+    branchId: row.branch_id,
+    playerId: row.player_id,
+    schoolId: row.school_id,
+    place: row.place,
+    points: row.points,
   };
 }
 
