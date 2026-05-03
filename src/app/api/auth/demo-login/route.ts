@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { DEMO_ADMIN_COOKIE, getConfiguredAdminPassword, isDemoLoginEnabled, verifyAdminPassword } from "@/lib/server/auth";
+import {
+  DEMO_ADMIN_COOKIE,
+  getConfiguredAdminPassword,
+  getDemoAdminCookieValue,
+  isDemoLoginEnabled,
+  verifyAdminPassword,
+} from "@/lib/server/auth";
 
 export async function POST(request: Request) {
   if (!isDemoLoginEnabled()) {
@@ -17,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(DEMO_ADMIN_COOKIE, "1", {
+  response.cookies.set(DEMO_ADMIN_COOKIE, getDemoAdminCookieValue()!, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

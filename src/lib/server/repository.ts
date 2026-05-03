@@ -161,6 +161,7 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
 
 export async function confirmImport(payload: ImportPayload, actorEmail?: string) {
   const supabase = getSupabaseAdminClient();
+  const replacedRows = await countExistingResults(payload.tournamentId, payload.categoryId, payload.branchId);
 
   if (!supabase) {
     const snapshot = await getLocalSnapshot();
@@ -170,6 +171,7 @@ export async function confirmImport(payload: ImportPayload, actorEmail?: string)
     return {
       mode: "local" as const,
       savedRows: payload.rows.length,
+      replacedRows,
       message: "Carga confirmada en almacenamiento local y rankings actualizados.",
     };
   }
@@ -180,8 +182,15 @@ export async function confirmImport(payload: ImportPayload, actorEmail?: string)
     branch_id: payload.branchId,
   };
 
-  await supabase.from("circuit_points").delete().match(scope);
-  await supabase.from("imported_results").delete().match(scope);
+  const { error: pointsDeleteError } = await supabase.from("circuit_points").delete().match(scope);
+  if (pointsDeleteError) {
+    throw new Error(pointsDeleteError.message);
+  }
+
+  const { error: resultsDeleteError } = await supabase.from("imported_results").delete().match(scope);
+  if (resultsDeleteError) {
+    throw new Error(resultsDeleteError.message);
+  }
 
   const resultRows = [];
 
@@ -256,6 +265,7 @@ export async function confirmImport(payload: ImportPayload, actorEmail?: string)
   return {
     mode: "supabase" as const,
     savedRows: payload.rows.length,
+    replacedRows,
     message: "Carga confirmada y rankings actualizados.",
   };
 }
@@ -521,12 +531,42 @@ export async function deleteImportedDate(tournamentId: string, actorEmail?: stri
   };
 }
 
+async function countExistingResults(tournamentId: string, categoryId: Category["id"], branchId: Branch["id"]) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const snapshot = await getLocalSnapshot();
+    return snapshot.importedResults.filter(
+      (result) =>
+        result.tournamentId === tournamentId &&
+        result.categoryId === categoryId &&
+        result.branchId === branchId,
+    ).length;
+  }
+
+  const { count, error } = await supabase
+    .from("imported_results")
+    .select("id", { count: "exact", head: true })
+    .match({
+      tournament_id: tournamentId,
+      category_id: categoryId,
+      branch_id: branchId,
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 export async function confirmMixedImport(
   payload: Omit<ImportPayload, "branchId">,
   actorEmail?: string,
 ) {
   const branches = ["absoluto", "femenino"] as const;
   let savedRows = 0;
+  let replacedRows = 0;
 
   for (const branchId of branches) {
     const branchRows = payload.rows
@@ -542,7 +582,7 @@ export async function confirmMixedImport(
       continue;
     }
 
-    await confirmImport(
+    const result = await confirmImport(
       {
         ...payload,
         branchId,
@@ -551,11 +591,13 @@ export async function confirmMixedImport(
       actorEmail,
     );
     savedRows += branchRows.length;
+    replacedRows += result.replacedRows;
   }
 
   return {
     mode: getSupabaseAdminClient() ? ("supabase" as const) : ("local" as const),
     savedRows,
+    replacedRows,
     message: `Carga mixta confirmada: ${savedRows} puntuantes separados por rama.`,
   };
 }
@@ -622,7 +664,7 @@ function applyImportToSnapshot(snapshot: CircuitSnapshot, payload: ImportPayload
 
   const rows = payload.rows.map((row) => {
     const school = getOrCreateLocalSchool(nextSnapshot, row.schoolName || "Colegio pendiente");
-    const player = getOrCreateLocalPlayer(nextSnapshot, row.playerName, school.id, row.branchId);
+    const player = getOrCreateLocalPlayer(nextSnapshot, row.playerName, school.id, payload.branchId);
 
     return {
       id: `result-${randomUUID()}`,

@@ -1,0 +1,7 @@
+.env*
+.data/
+.codex_spreadsheet_work/
+outputs/
+devserver*.log
+supabase/.temp/
+.next/

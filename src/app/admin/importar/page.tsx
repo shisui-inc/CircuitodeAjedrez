@@ -19,6 +19,7 @@ export default async function ImportPage() {
         categories={snapshot.categories}
         branches={snapshot.branches}
         initialRows={[]}
+        existingResults={snapshot.importedResults}
       />
     </div>
   );

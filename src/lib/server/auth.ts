@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 export const DEMO_ADMIN_COOKIE = "cea_admin_demo";
+const DEMO_ADMIN_COOKIE_MESSAGE = "cea_admin_demo:v1";
 
 export function isDemoLoginEnabled() {
   const explicitlyEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === "true";
@@ -22,10 +23,10 @@ export function getConfiguredAdminPassword() {
   return null;
 }
 
-export function verifyAdminPassword(password: string) {
+export function verifyAdminPassword(password: unknown) {
   const configuredPassword = getConfiguredAdminPassword();
 
-  if (!configuredPassword) {
+  if (!configuredPassword || typeof password !== "string") {
     return false;
   }
 
@@ -35,8 +36,28 @@ export function verifyAdminPassword(password: string) {
   return submitted.length === expected.length && timingSafeEqual(submitted, expected);
 }
 
+export function getDemoAdminCookieValue() {
+  const configuredPassword = getConfiguredAdminPassword();
+
+  if (!configuredPassword) {
+    return null;
+  }
+
+  return createHmac("sha256", configuredPassword).update(DEMO_ADMIN_COOKIE_MESSAGE).digest("hex");
+}
+
 export function hasDemoAdminCookie(request: NextRequest) {
-  return request.cookies.get(DEMO_ADMIN_COOKIE)?.value === "1";
+  const expected = getDemoAdminCookieValue();
+  const submittedValue = request.cookies.get(DEMO_ADMIN_COOKIE)?.value;
+
+  if (!expected || !submittedValue) {
+    return false;
+  }
+
+  const submitted = Buffer.from(submittedValue);
+  const signed = Buffer.from(expected);
+
+  return submitted.length === signed.length && timingSafeEqual(submitted, signed);
 }
 
 export async function hasAdminSession(request: NextRequest) {

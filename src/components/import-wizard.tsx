@@ -24,16 +24,17 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { validateImportRows } from "@/lib/normalize";
-import type { Branch, BranchId, Category, CategoryId, CircuitDate, ImportRow } from "@/lib/types";
+import type { Branch, BranchId, Category, CategoryId, CircuitDate, ImportedResult, ImportRow } from "@/lib/types";
 
 interface ImportWizardProps {
   dates: CircuitDate[];
   categories: Category[];
   branches: Branch[];
   initialRows: ImportRow[];
+  existingResults: ImportedResult[];
 }
 
-export function ImportWizard({ dates, categories, branches, initialRows }: ImportWizardProps) {
+export function ImportWizard({ dates, categories, branches, initialRows, existingResults }: ImportWizardProps) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [tournamentId, setTournamentId] = useState(dates[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState<CategoryId>(categories[0]?.id ?? "sub-6");
@@ -50,6 +51,14 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
   const branchPendingCount = rows.filter((row) => row.branchId !== "absoluto" && row.branchId !== "femenino").length;
   const blockingIssues = issues.filter((issue) => issue.severity === "error");
   const branchPreview = useMemo(() => buildBranchPreview(rows), [rows]);
+  const existingScopes = useMemo(
+    () => buildExistingScopes(existingResults, categories, branches, tournamentId),
+    [existingResults, categories, branches, tournamentId],
+  );
+  const selectedExistingScopes = existingScopes.filter((scope) => scope.categoryId === categoryId);
+  const selectedReplacementCount = selectedExistingScopes
+    .filter((scope) => mixedMode || scope.branchId === branchId)
+    .reduce((total, scope) => total + scope.rows, 0);
 
   async function parseSource() {
     setIsParsing(true);
@@ -147,14 +156,22 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
         headers: { "content-type": "application/json" },
         body: JSON.stringify(mixedMode ? { sourceUrl, tournamentId, categoryId, rows } : { sourceUrl, tournamentId, categoryId, branchId, rows }),
       });
-      const payload = await readResponse<{ message?: string; savedRows?: number; error?: string }>(response);
+      const payload = await readResponse<{
+        message?: string;
+        savedRows?: number;
+        replacedRows?: number;
+        error?: string;
+      }>(response);
 
       if (!response.ok) {
         throw new Error(payload.error ?? "No se pudo confirmar la carga.");
       }
 
       setStatusVariant("success");
-      setStatus(`${payload.message ?? "Carga confirmada."} Filas guardadas: ${payload.savedRows ?? rows.length}.`);
+      setStatus(
+        `${payload.message ?? "Carga confirmada."} Filas guardadas: ${payload.savedRows ?? rows.length}. ` +
+          `Filas previas reemplazadas: ${payload.replacedRows ?? 0}.`,
+      );
     } catch (error) {
       setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo confirmar la carga.");
@@ -279,6 +296,43 @@ export function ImportWizard({ dates, categories, branches, initialRows }: Impor
           </div>
         </CardContent>
       </Card>
+
+      {existingScopes.length ? (
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle>Cargas existentes en la fecha seleccionada</CardTitle>
+            <CardDescription>
+              Confirmar una carga reemplaza solamente la misma fecha, categoria y rama seleccionadas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {existingScopes.map((scope) => (
+                <div
+                  key={`${scope.categoryId}-${scope.branchId}`}
+                  className={`rounded-lg border p-3 text-sm ${
+                    scope.categoryId === categoryId && (mixedMode || scope.branchId === branchId)
+                      ? "border-amber-300 bg-amber-50 text-amber-950"
+                      : "bg-white"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    {scope.categoryName} - {scope.branchName}
+                  </p>
+                  <p className="text-muted-foreground">{scope.rows} filas cargadas</p>
+                </div>
+              ))}
+            </div>
+            {selectedReplacementCount > 0 ? (
+              <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+                Esta confirmacion va a reemplazar {selectedReplacementCount} filas ya cargadas en{" "}
+                {categories.find((category) => category.id === categoryId)?.name ?? categoryId}
+                {mixedMode ? " para ambas ramas." : ` - ${branches.find((branch) => branch.id === branchId)?.name ?? branchId}.`}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="rounded-lg">
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -431,6 +485,42 @@ function buildBranchPreview(rows: ImportRow[]) {
     absoluto: sortRows("absoluto"),
     femenino: sortRows("femenino"),
   };
+}
+
+function buildExistingScopes(
+  results: ImportedResult[],
+  categories: Category[],
+  branches: Branch[],
+  tournamentId: string,
+) {
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const branchById = new Map(branches.map((branch) => [branch.id, branch]));
+  const counts = new Map<string, { categoryId: CategoryId; branchId: BranchId; rows: number }>();
+
+  for (const result of results) {
+    if (result.tournamentId !== tournamentId) {
+      continue;
+    }
+
+    const key = `${result.categoryId}-${result.branchId}`;
+    const current = counts.get(key);
+    counts.set(key, {
+      categoryId: result.categoryId,
+      branchId: result.branchId,
+      rows: (current?.rows ?? 0) + 1,
+    });
+  }
+
+  return Array.from(counts.values())
+    .map((scope) => ({
+      ...scope,
+      categoryName: categoryById.get(scope.categoryId)?.name ?? scope.categoryId,
+      branchName: branchById.get(scope.branchId)?.name ?? scope.branchId,
+      sortOrder:
+        (categoryById.get(scope.categoryId)?.sortOrder ?? 999) * 10 +
+        (branchById.get(scope.branchId)?.sortOrder ?? 9),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function PreviewPanel({

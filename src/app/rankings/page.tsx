@@ -47,6 +47,19 @@ export default async function PublicRankingsPage() {
         className="pointer-events-none fixed inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[length:32px_32px]"
         aria-hidden="true"
       />
+      <a
+        href="#categorias"
+        aria-label="Volver a categorias"
+        className="fixed bottom-4 right-4 z-50 flex size-16 items-center justify-center overflow-hidden rounded-lg border-2 border-slate-900 bg-white shadow-[0_5px_0_#0f172a] transition hover:-translate-y-0.5 hover:shadow-[0_7px_0_#0f172a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 sm:bottom-6 sm:right-6 sm:size-20"
+      >
+        <Image
+          src="/peonparaariba.png"
+          alt=""
+          width={96}
+          height={96}
+          className="h-full w-full object-cover"
+        />
+      </a>
       <section className="relative overflow-hidden border-b-4 border-slate-900 bg-[#f8fafc]">
         <div className="absolute inset-0 opacity-70" aria-hidden="true">
           <div className="h-full w-full bg-[linear-gradient(45deg,#0f172a_25%,transparent_25%),linear-gradient(-45deg,#0f172a_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#0f172a_75%),linear-gradient(-45deg,transparent_75%,#0f172a_75%)] bg-[length:72px_72px] bg-[position:0_0,0_36px,36px_-36px,-36px_0] opacity-[0.055]" />
@@ -133,7 +146,7 @@ export default async function PublicRankingsPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto w-full max-w-7xl px-4 py-8 lg:px-8">
+      <section id="categorias" className="relative mx-auto w-full max-w-7xl scroll-mt-6 px-4 py-8 lg:px-8">
         <div className="mb-5 flex items-center gap-3">
           <Sparkles className="size-5 text-emerald-700" />
           <h2 className="text-2xl font-black tracking-normal">Elegir categoria</h2>
