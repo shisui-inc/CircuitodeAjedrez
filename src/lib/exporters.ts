@@ -1,13 +1,26 @@
 type ExportCell = string | number | null | undefined;
 
-export interface ExportSheet {
-  sheetName: string;
+export type ExportRowKind = "title" | "section" | "header" | "data" | "spacer";
+
+export interface ExportSection {
+  title: string;
   headers: string[];
   rows: ExportCell[][];
+  tone?: "blue" | "cyan" | "pink";
+}
+
+export interface ExportSheet {
+  sheetName: string;
+  title?: string;
+  headers?: string[];
+  rows?: ExportCell[][];
+  sections?: ExportSection[];
 }
 
 export function toCsv(sheet: ExportSheet) {
-  return [sheet.headers, ...sheet.rows]
+  const rows = flattenSheet(sheet).map((row) => row.cells);
+
+  return rows
     .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
     .join("\r\n");
 }
@@ -28,25 +41,105 @@ export async function toXlsxBuffer(sheet: ExportSheet) {
 }
 
 function buildWorksheetXml(sheet: ExportSheet) {
-  const rows = [sheet.headers, ...sheet.rows];
+  const rows = flattenSheet(sheet);
+  const maxColumns = Math.max(1, ...rows.map((row) => row.cells.length));
+  const merges: string[] = [];
   const rowXml = rows
     .map((row, rowIndex) => {
-      const cells = row
-        .map((cell, columnIndex) => buildCellXml(cell, columnName(columnIndex) + (rowIndex + 1)))
+      const rowNumber = rowIndex + 1;
+      const cells = padCells(row.cells, maxColumns)
+        .map((cell, columnIndex) => buildCellXml(cell, columnName(columnIndex) + rowNumber, row.kind, row.tone))
         .join("");
-      return `<row r="${rowIndex + 1}">${cells}</row>`;
+
+      if ((row.kind === "title" || row.kind === "section") && maxColumns > 1) {
+        merges.push(`<mergeCell ref="A${rowNumber}:${columnName(maxColumns - 1)}${rowNumber}"/>`);
+      }
+
+      return `<row r="${rowNumber}"${row.kind === "spacer" ? ' ht="12" customHeight="1"' : ""}>${cells}</row>`;
     })
     .join("");
+  const colsXml = buildColsXml(maxColumns);
+  const mergeXml = merges.length ? `<mergeCells count="${merges.length}">${merges.join("")}</mergeCells>` : "";
 
-  return xmlHeader(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowXml}</sheetData></worksheet>`);
+  return xmlHeader(
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${colsXml}<sheetData>${rowXml}</sheetData>${mergeXml}</worksheet>`,
+  );
 }
 
-function buildCellXml(cell: ExportCell, reference: string) {
+function buildCellXml(cell: ExportCell, reference: string, kind: ExportRowKind, tone?: ExportSection["tone"]) {
+  const styleId = styleIdFor(kind, tone);
+
   if (typeof cell === "number" && Number.isFinite(cell)) {
-    return `<c r="${reference}" t="n"><v>${cell}</v></c>`;
+    return `<c r="${reference}"${styleId ? ` s="${styleId}"` : ""} t="n"><v>${cell}</v></c>`;
   }
 
-  return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(String(cell ?? ""))}</t></is></c>`;
+  return `<c r="${reference}"${styleId ? ` s="${styleId}"` : ""} t="inlineStr"><is><t>${escapeXml(String(cell ?? ""))}</t></is></c>`;
+}
+
+function flattenSheet(sheet: ExportSheet): Array<{ cells: ExportCell[]; kind: ExportRowKind; tone?: ExportSection["tone"] }> {
+  if (sheet.sections?.length) {
+    const rows: Array<{ cells: ExportCell[]; kind: ExportRowKind; tone?: ExportSection["tone"] }> = [];
+
+    if (sheet.title) {
+      rows.push({ cells: [sheet.title], kind: "title", tone: "blue" });
+    }
+
+    sheet.sections.forEach((section, index) => {
+      if (index > 0) {
+        rows.push({ cells: [""], kind: "spacer" });
+      }
+
+      rows.push({ cells: [section.title], kind: "section", tone: section.tone ?? "cyan" });
+      rows.push({ cells: section.headers, kind: "header" });
+      rows.push(...section.rows.map((cells) => ({ cells, kind: "data" as const })));
+    });
+
+    return rows;
+  }
+
+  return [
+    { cells: sheet.headers ?? [], kind: "header" },
+    ...(sheet.rows ?? []).map((cells) => ({ cells, kind: "data" as const })),
+  ];
+}
+
+function padCells(cells: ExportCell[], maxColumns: number) {
+  return [...cells, ...Array.from({ length: Math.max(0, maxColumns - cells.length) }, () => "")];
+}
+
+function buildColsXml(maxColumns: number) {
+  const widths = [10, 34, 42, 12, 14, 14, 14, 18];
+  const cols = Array.from({ length: maxColumns }, (_, index) => {
+    const column = index + 1;
+    const width = widths[index] ?? 16;
+    return `<col min="${column}" max="${column}" width="${width}" customWidth="1"/>`;
+  }).join("");
+
+  return `<cols>${cols}</cols>`;
+}
+
+function styleIdFor(kind: ExportRowKind, tone?: ExportSection["tone"]) {
+  if (kind === "title") {
+    return 1;
+  }
+
+  if (kind === "section") {
+    if (tone === "pink") {
+      return 3;
+    }
+
+    return 2;
+  }
+
+  if (kind === "header") {
+    return 4;
+  }
+
+  if (kind === "data") {
+    return 5;
+  }
+
+  return 0;
 }
 
 function columnName(index: number) {
@@ -109,6 +202,6 @@ function workbookRelsXml() {
 
 function stylesXml() {
   return xmlHeader(
-    `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Geist"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellXfs></styleSheet>`,
+    `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Geist"/></font><font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Geist"/></font><font><b/><sz val="11"/><name val="Geist"/></font></fonts><fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F497D"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF12A8D7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFF9999"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="2" fillId="5" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyFont="1" applyBorder="1"/></cellXfs></styleSheet>`,
   );
 }

@@ -124,12 +124,20 @@ export function computeIndividualRankings(
   return withRanks([...grouped.values()].sort(compareIndividualRows));
 }
 
-export function computeSchoolRankings(snapshot: CircuitSnapshot): SchoolRankingRow[] {
+export function computeSchoolRankings(snapshot: CircuitSnapshot, filters: RankingFilters = {}): SchoolRankingRow[] {
   const circuitPoints = buildCircuitPoints(snapshot);
   const schoolById = new Map(snapshot.schools.map((school) => [school.id, school]));
+  const categoryFilter = filters.categoryId ?? "general";
+  const branchFilter = filters.branchId ?? "general";
   const grouped = new Map<string, SchoolRankingRow>();
 
-  for (const point of circuitPoints) {
+  const scopedPoints = circuitPoints.filter((point) => {
+    const categoryMatches = categoryFilter === "general" || point.categoryId === categoryFilter;
+    const branchMatches = branchFilter === "general" || point.branchId === branchFilter;
+    return categoryMatches && branchMatches;
+  });
+
+  for (const point of scopedPoints) {
     const school = schoolById.get(point.schoolId);
 
     if (!school) {
@@ -165,7 +173,7 @@ export function computeSchoolRankings(snapshot: CircuitSnapshot): SchoolRankingR
   }
 
   for (const row of grouped.values()) {
-    const schoolPoints = circuitPoints.filter((point) => point.schoolId === row.schoolId);
+    const schoolPoints = scopedPoints.filter((point) => point.schoolId === row.schoolId);
     row.datesWithPoints = new Set(schoolPoints.map((point) => point.tournamentId)).size;
     row.playersWithPoints = new Set(schoolPoints.map((point) => point.playerId)).size;
   }

@@ -3,12 +3,18 @@ import { Button } from "@/components/ui/button";
 
 interface ExportActionsProps {
   scope: "individual" | "colegios";
+  report?: "ranking" | "por-fecha" | "acumulado-categorias";
   categoryId?: string;
   branchId?: string;
 }
 
-export function ExportActions({ scope, categoryId = "general", branchId = "general" }: ExportActionsProps) {
-  const query = new URLSearchParams({ scope, categoryId, branchId });
+export function ExportActions({
+  scope,
+  report = "ranking",
+  categoryId = "general",
+  branchId = "general",
+}: ExportActionsProps) {
+  const query = new URLSearchParams({ scope, report, categoryId, branchId });
 
   return (
     <div className="flex flex-wrap gap-2">

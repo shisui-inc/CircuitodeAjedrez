@@ -1,4 +1,4 @@
-import { FileSpreadsheet, Trophy } from "lucide-react";
+import { CalendarDays, FileSpreadsheet, School, Trophy } from "lucide-react";
 import { ExportActions } from "@/components/export-actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -24,6 +24,30 @@ export default function ReportsPage() {
         </Card>
         <Card className="rounded-lg">
           <CardHeader>
+            <div className="flex size-10 items-center justify-center rounded-md bg-cyan-50 text-cyan-700">
+              <CalendarDays className="size-5" />
+            </div>
+            <CardTitle>Resultado individual por fecha</CardTitle>
+            <CardDescription>Exporta cada fecha separada por categoria y rama con el formato de tabla.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExportActions scope="individual" report="por-fecha" />
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex size-10 items-center justify-center rounded-md bg-violet-50 text-violet-700">
+              <Trophy className="size-5" />
+            </div>
+            <CardTitle>Resultado individual acumulado</CardTitle>
+            <CardDescription>Exporta acumulados por categoria y rama en secciones ordenadas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExportActions scope="individual" report="acumulado-categorias" />
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
             <div className="flex size-10 items-center justify-center rounded-md bg-sky-50 text-sky-700">
               <FileSpreadsheet className="size-5" />
             </div>
@@ -32,6 +56,30 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <ExportActions scope="colegios" />
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex size-10 items-center justify-center rounded-md bg-indigo-50 text-indigo-700">
+              <CalendarDays className="size-5" />
+            </div>
+            <CardTitle>Resultado colegios por fecha</CardTitle>
+            <CardDescription>Exporta puntos de colegios por fecha, categoria y rama.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExportActions scope="colegios" report="por-fecha" />
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex size-10 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+              <School className="size-5" />
+            </div>
+            <CardTitle>Resultado colegios acumulado</CardTitle>
+            <CardDescription>Exporta acumulados de colegios por categoria y rama.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExportActions scope="colegios" report="acumulado-categorias" />
           </CardContent>
         </Card>
       </div>
