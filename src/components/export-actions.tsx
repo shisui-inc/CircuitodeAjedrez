@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 interface ExportActionsProps {
   scope: "individual" | "colegios";
-  report?: "ranking" | "por-fecha" | "acumulado-categorias";
+  report?: "ranking" | "por-fecha" | "acumulado-categorias" | "cupo-sudamericano-acumulado";
   categoryId?: string;
   branchId?: string;
 }

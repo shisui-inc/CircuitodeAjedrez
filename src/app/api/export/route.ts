@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getBranchName, getCategoryName } from "@/lib/circuit";
+import { buildCupoSudamericanoSheet } from "@/lib/cupo-report";
 import { buildCircuitPoints, computeIndividualRankings, computeSchoolRankings } from "@/lib/rankings";
 import { toCsv, toXlsxBuffer, type ExportSection, type ExportSheet } from "@/lib/exporters";
 import { getCircuitSnapshot } from "@/lib/server/repository";
@@ -42,6 +43,10 @@ function buildSheet(
   categoryId: CategoryId | "general",
   branchId: BranchId | "general",
 ): ExportSheet {
+  if (report === "cupo-sudamericano-acumulado") {
+    return buildCupoSudamericanoSheet(snapshot);
+  }
+
   if (scope === "individual" && report === "por-fecha") {
     return buildIndividualByDateSheet(snapshot);
   }
@@ -263,7 +268,9 @@ function ordinal(rank: number) {
 function fileName(scope: string, report: string, extension: "csv" | "xlsx") {
   const base = scope === "colegios" ? "colegios" : "individual";
   const label =
-    report === "por-fecha"
+    report === "cupo-sudamericano-acumulado"
+      ? "Cupo sudamericano acumulado"
+      : report === "por-fecha"
       ? `resultados-${base}-por-fecha`
       : report === "acumulado-categorias"
         ? `resultados-${base}-acumulado`

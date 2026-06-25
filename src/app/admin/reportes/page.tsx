@@ -1,4 +1,4 @@
-import { CalendarDays, FileSpreadsheet, School, Trophy } from "lucide-react";
+import { CalendarDays, FileSpreadsheet, Medal, School, Trophy } from "lucide-react";
 import { ExportActions } from "@/components/export-actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -80,6 +80,20 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <ExportActions scope="colegios" report="acumulado-categorias" />
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex size-10 items-center justify-center rounded-md bg-rose-50 text-rose-700">
+              <Medal className="size-5" />
+            </div>
+            <CardTitle>Cupo sudamericano acumulado</CardTitle>
+            <CardDescription>
+              Documento interno con colegios titulares, alternos y jugadores que mas puntos aportaron por categoria y rama.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ExportActions scope="colegios" report="cupo-sudamericano-acumulado" />
           </CardContent>
         </Card>
       </div>
