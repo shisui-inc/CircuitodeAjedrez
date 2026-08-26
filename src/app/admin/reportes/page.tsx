@@ -1,8 +1,11 @@
-import { CalendarDays, FileSpreadsheet, Medal, School, Trophy } from "lucide-react";
+import { Archive, CalendarDays, FileSpreadsheet, Medal, School, Trophy } from "lucide-react";
 import { ExportActions } from "@/components/export-actions";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSelectedCircuit } from "@/lib/server/repository";
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  const circuit = await getSelectedCircuit();
   return (
     <div className="space-y-6">
       <div>
@@ -10,6 +13,14 @@ export default function ReportsPage() {
         <p className="text-sm text-muted-foreground">Descargue rankings en CSV o XLSX para publicar, imprimir o archivar.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
+        <Card className="rounded-lg border-emerald-200 bg-emerald-50/40 md:col-span-2">
+          <CardHeader>
+            <div className="flex size-10 items-center justify-center rounded-md bg-emerald-100 text-emerald-800"><Archive className="size-5" /></div>
+            <CardTitle>Archivo completo de {circuit.shortName}</CardTitle>
+            <CardDescription>Un solo Excel con datos del circuito, fechas, jugadores, colegios, resultados, puntos y auditoría.</CardDescription>
+          </CardHeader>
+          <CardContent><Button asChild><a href={`/api/export?scope=full&report=archive&format=xlsx&circuitId=${circuit.id}`}><FileSpreadsheet className="size-4" />Descargar Excel completo</a></Button></CardContent>
+        </Card>
         <Card className="rounded-lg">
           <CardHeader>
             <div className="flex size-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">

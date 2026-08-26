@@ -57,11 +57,6 @@ create table if not exists public.tournaments (
   unique (circuit_id, round)
 );
 
-update public.tournaments
-set status = 'cerrada'
-where circuit_id = 'circuito-paranaense-2026'
-  and status = 'importada';
-
 alter table public.tournaments
   add column if not exists circuit_id text not null default 'circuito-paranaense-2026' references public.circuits(id) on delete cascade;
 
@@ -282,43 +277,13 @@ drop policy if exists "authenticated insert audit logs" on public.audit_logs;
 create policy "public read categories" on public.categories for select using (true);
 create policy "public read circuits" on public.circuits for select using (is_published = true or auth.role() = 'authenticated');
 create policy "public read branches" on public.branches for select using (true);
-create policy "public read tournaments" on public.tournaments for select using (
-  auth.role() = 'authenticated'
-  or (
-    status = 'cerrada'
-    and exists (
-      select 1 from public.circuits
-      where circuits.id = tournaments.circuit_id
-        and circuits.is_published = true
-    )
-  )
-);
+create policy "public read tournaments" on public.tournaments for select using (true);
 create policy "public read schools" on public.schools for select using (true);
 create policy "public read school aliases" on public.school_aliases for select using (true);
 create policy "public read players" on public.players for select using (true);
-create policy "public read imported results" on public.imported_results for select using (
-  auth.role() = 'authenticated'
-  or exists (
-    select 1
-    from public.tournaments
-    join public.circuits on circuits.id = tournaments.circuit_id
-    where tournaments.id = imported_results.tournament_id
-      and tournaments.status = 'cerrada'
-      and circuits.is_published = true
-  )
-);
+create policy "public read imported results" on public.imported_results for select using (true);
 create policy "public read point rules" on public.point_rules for select using (true);
-create policy "public read circuit points" on public.circuit_points for select using (
-  auth.role() = 'authenticated'
-  or exists (
-    select 1
-    from public.tournaments
-    join public.circuits on circuits.id = tournaments.circuit_id
-    where tournaments.id = circuit_points.tournament_id
-      and tournaments.status = 'cerrada'
-      and circuits.is_published = true
-  )
-);
+create policy "public read circuit points" on public.circuit_points for select using (true);
 
 create policy "authenticated write categories" on public.categories for all to authenticated using (true) with check (true);
 create policy "authenticated write circuits" on public.circuits for all to authenticated using (true) with check (true);

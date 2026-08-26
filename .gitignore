@@ -31,6 +31,7 @@ yarn-error.log*
 .pnpm-debug.log*
 devserver.log
 devserver.*.log
+devserver-*.log
 
 # local generated data/artifacts
 /.data/

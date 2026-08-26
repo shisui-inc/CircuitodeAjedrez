@@ -3,8 +3,8 @@ import { getBranchName, getCategoryName } from "@/lib/circuit";
 import { buildCupoSudamericanoSheet } from "@/lib/cupo-report";
 import { buildCircuitPoints, computeIndividualRankings, computeSchoolRankings } from "@/lib/rankings";
 import { toCsv, toXlsxBuffer, type ExportSection, type ExportSheet } from "@/lib/exporters";
-import { getCircuitSnapshot } from "@/lib/server/repository";
-import type { BranchId, CategoryId, CircuitSnapshot } from "@/lib/types";
+import { getCircuitCatalog, getCircuitSnapshot } from "@/lib/server/repository";
+import type { BranchId, CategoryId, Circuit, CircuitSnapshot } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -15,15 +15,17 @@ export async function GET(request: NextRequest) {
   const format = searchParams.get("format") ?? "csv";
   const categoryId = (searchParams.get("categoryId") ?? "general") as CategoryId | "general";
   const branchId = (searchParams.get("branchId") ?? "general") as BranchId | "general";
-  const snapshot = await getCircuitSnapshot();
-  const sheet = buildSheet(scope, report, snapshot, categoryId, branchId);
+  const circuitId = searchParams.get("circuitId") ?? undefined;
+  const [snapshot, circuits] = await Promise.all([getCircuitSnapshot(circuitId), getCircuitCatalog()]);
+  const circuit = circuits.find((item) => item.id === circuitId);
+  const sheet = buildSheet(scope, report, snapshot, categoryId, branchId, circuit);
 
   if (format === "xlsx") {
     const buffer = await toXlsxBuffer(sheet);
     return new Response(new Uint8Array(buffer), {
       headers: {
         "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "content-disposition": `attachment; filename="${fileName(scope, report, "xlsx")}"`,
+        "content-disposition": `attachment; filename="${fileName(scope, report, "xlsx", circuit)}"`,
       },
     });
   }
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
   return new Response(toCsv(sheet), {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${fileName(scope, report, "csv")}"`,
+      "content-disposition": `attachment; filename="${fileName(scope, report, "csv", circuit)}"`,
     },
   });
 }
@@ -42,7 +44,11 @@ function buildSheet(
   snapshot: Awaited<ReturnType<typeof getCircuitSnapshot>>,
   categoryId: CategoryId | "general",
   branchId: BranchId | "general",
+  circuit?: Circuit,
 ): ExportSheet {
+  if (scope === "full" || report === "archive") {
+    return buildFullCircuitArchive(snapshot, circuit);
+  }
   if (report === "cupo-sudamericano-acumulado") {
     return buildCupoSudamericanoSheet(snapshot);
   }
@@ -96,6 +102,77 @@ function buildSheet(
     sheetName: "Ranking individual",
     headers: ["Puesto", "Jugador", "Colegio", "Puntos", "Primeros", "Podios", "Fechas", "Ultimo mejor puesto"],
     rows,
+  };
+}
+
+function buildFullCircuitArchive(snapshot: CircuitSnapshot, circuit?: Circuit): ExportSheet {
+  const points = buildCircuitPoints(snapshot);
+  return {
+    sheetName: "Archivo completo",
+    title: `Archivo completo - ${circuit?.name ?? "Circuito de ajedrez"}`,
+    sections: [
+      {
+        title: "Datos del circuito",
+        headers: ["Campo", "Valor"],
+        rows: [
+          ["Nombre", circuit?.name ?? ""],
+          ["Nombre corto", circuit?.shortName ?? ""],
+          ["Temporada", circuit?.season ?? ""],
+          ["Ubicacion", circuit?.location ?? ""],
+          ["Estado", circuit?.status ?? ""],
+          ["Publicado", circuit?.isPublished ? "Si" : "No"],
+          ["Descripcion", circuit?.description ?? ""],
+        ],
+        tone: "blue",
+      },
+      {
+        title: "Fechas y torneos",
+        headers: ["ID", "Numero", "Nombre", "Dia", "Estado", "Fuente"],
+        rows: snapshot.dates.toSorted((a, b) => a.round - b.round).map((date) => [date.id, date.round, date.name, date.date, date.status, date.sourceUrl ?? ""]),
+        tone: "cyan",
+      },
+      {
+        title: "Jugadores",
+        headers: ["ID", "Nombre", "Colegio ID", "Rama", "Anio de nacimiento"],
+        rows: snapshot.players.map((player) => [player.id, player.fullName, player.schoolId, player.branchId ?? "", player.birthYear ?? ""]),
+        tone: "cyan",
+      },
+      {
+        title: "Colegios",
+        headers: ["ID", "Nombre oficial", "Ciudad", "Alias"],
+        rows: snapshot.schools.map((school) => [school.id, school.officialName, school.city ?? "", school.aliases.join(" | ")]),
+        tone: "cyan",
+      },
+      {
+        title: "Todos los resultados",
+        headers: ["Fecha ID", "Categoria", "Rama", "Puesto", "Jugador", "Colegio", "Puntos torneo", "Puntos circuito", "Fuente", "Revisar"],
+        rows: snapshot.importedResults.map((result) => [
+          result.tournamentId,
+          getCategoryName(result.categoryId),
+          getBranchName(result.branchId),
+          result.place ?? "",
+          result.playerName,
+          result.schoolName,
+          result.tournamentPoints,
+          points.find((point) => point.importedResultId === result.id)?.points ?? 0,
+          result.sourceUrl ?? "",
+          result.needsReview ? "Si" : "No",
+        ]),
+        tone: "pink",
+      },
+      {
+        title: "Reglas de puntuacion",
+        headers: ["Puesto", "Puntos"],
+        rows: snapshot.pointRules.map((rule) => [rule.place, rule.points]),
+        tone: "cyan",
+      },
+      {
+        title: "Auditoria",
+        headers: ["Fecha", "Accion", "Entidad", "Responsable", "Resumen"],
+        rows: snapshot.auditLogs.map((log) => [log.createdAt, log.action, log.entityType, log.actorEmail ?? "", log.summary]),
+        tone: "cyan",
+      },
+    ],
   };
 }
 
@@ -265,7 +342,11 @@ function ordinal(rank: number) {
   return `${rank}${suffixes[rank] ?? "to"}`;
 }
 
-function fileName(scope: string, report: string, extension: "csv" | "xlsx") {
+function fileName(scope: string, report: string, extension: "csv" | "xlsx", circuit?: Circuit) {
+  if (scope === "full" || report === "archive") {
+    const slug = circuit?.slug ?? "circuito";
+    return `archivo-completo-${slug}.${extension}`;
+  }
   const base = scope === "colegios" ? "colegios" : "individual";
   const label =
     report === "cupo-sudamericano-acumulado"

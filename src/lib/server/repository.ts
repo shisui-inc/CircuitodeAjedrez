@@ -3,14 +3,18 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { cookies } from "next/headers";
 import { DEFAULT_POINT_RULES } from "@/lib/circuit";
+import { LEGACY_CIRCUIT, LEGACY_CIRCUIT_ID, slugifyCircuitName } from "@/lib/circuits";
 import { demoSnapshot } from "@/lib/demo-data";
 import { getCircuitPoints } from "@/lib/circuit";
 import { normalizeText } from "@/lib/normalize";
+import { filterPublishedSnapshot } from "@/lib/publication";
 import type {
   AuditLog,
   Branch,
   Category,
+  Circuit,
   CircuitDate,
   CircuitSnapshot,
   ImportPayload,
@@ -22,6 +26,8 @@ import { getSupabaseAdminClient, getSupabaseAdminConfigStatus } from "@/lib/serv
 
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".data");
 const LOCAL_SNAPSHOT_PATH = path.join(LOCAL_DATA_DIR, "circuit-snapshot.json");
+const LOCAL_CIRCUITS_PATH = path.join(LOCAL_DATA_DIR, "circuits.json");
+const ADMIN_CIRCUIT_COOKIE = "admin-circuit-id";
 
 function canUseLocalFileStorage() {
   return !process.env.VERCEL && process.env.NODE_ENV !== "production";
@@ -46,6 +52,7 @@ interface PlayerRow {
 
 interface TournamentRow {
   id: string;
+  circuit_id?: string | null;
   name: string;
   round: number;
   date: string;
@@ -94,12 +101,18 @@ interface AuditRow {
   metadata: Record<string, unknown> | null;
 }
 
-export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
+export async function getCircuitSnapshot(circuitId?: string): Promise<CircuitSnapshot> {
+  const selectedCircuitId = circuitId ?? (await getSelectedCircuitId());
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    return getLocalSnapshot();
+    return getLocalSnapshot(selectedCircuitId);
   }
+
+  const { data: tournamentCircuitRows } = await supabase.from("tournaments").select("id,circuit_id");
+  const tournamentCircuitMap = new Map(
+    (tournamentCircuitRows ?? []).map((row) => [row.id as string, row.circuit_id as string | null]),
+  );
 
   const [
     categoriesResponse,
@@ -155,6 +168,19 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
     return structuredClone(demoSnapshot);
   }
 
+  const belongsToSelectedCircuit = (tournamentId: string) =>
+    tournamentCircuitMap.size
+      ? tournamentCircuitMap.get(tournamentId) === selectedCircuitId
+      : selectedCircuitId === LEGACY_CIRCUIT_ID;
+  const importedResults = ((resultsResponse.data ?? []) as ImportedResultRow[])
+    .filter((row) => belongsToSelectedCircuit(row.tournament_id))
+    .map(mapImportedResult);
+  const circuitPoints = ((circuitPointsResponse.data ?? []) as CircuitPointRow[])
+    .filter((row) => belongsToSelectedCircuit(row.tournament_id))
+    .map(mapCircuitPoint);
+  const playerIds = new Set(importedResults.map((result) => result.playerId));
+  const schoolIds = new Set(importedResults.map((result) => result.schoolId));
+
   return {
     categories:
       categoriesResponse.data?.map((row) => ({
@@ -168,13 +194,300 @@ export async function getCircuitSnapshot(): Promise<CircuitSnapshot> {
         name: row.name,
         sortOrder: row.sort_order,
       })) ?? demoSnapshot.branches,
-    dates: ((datesResponse.data ?? []) as TournamentRow[]).map(mapTournament),
-    schools: ((schoolsResponse.data ?? []) as SchoolRow[]).map(mapSchool),
-    players: ((playersResponse.data ?? []) as PlayerRow[]).map(mapPlayer),
-    importedResults: ((resultsResponse.data ?? []) as ImportedResultRow[]).map(mapImportedResult),
-    circuitPoints: ((circuitPointsResponse.data ?? []) as CircuitPointRow[]).map(mapCircuitPoint),
+    dates: ((datesResponse.data ?? []) as TournamentRow[])
+      .filter((row) => {
+        return belongsToSelectedCircuit(row.id);
+      })
+      .map((row) => mapTournament({ ...row, circuit_id: selectedCircuitId })),
+    schools: ((schoolsResponse.data ?? []) as SchoolRow[]).filter((row) => schoolIds.has(row.id)).map(mapSchool),
+    players: ((playersResponse.data ?? []) as PlayerRow[]).filter((row) => playerIds.has(row.id)).map(mapPlayer),
+    importedResults,
+    circuitPoints,
     pointRules: pointRulesResponse.data?.length ? pointRulesResponse.data : DEFAULT_POINT_RULES,
-    auditLogs: ((auditResponse.data ?? []) as AuditRow[]).map(mapAuditLog),
+    auditLogs: ((auditResponse.data ?? []) as AuditRow[])
+      .filter((row) => {
+        const metadataCircuitId = row.metadata?.circuitId;
+        const metadataTournamentId = row.metadata?.tournamentId;
+        return metadataCircuitId === selectedCircuitId ||
+          (typeof metadataTournamentId === "string" && belongsToSelectedCircuit(metadataTournamentId)) ||
+          (!metadataCircuitId && !metadataTournamentId && selectedCircuitId === LEGACY_CIRCUIT_ID);
+      })
+      .map(mapAuditLog),
+  };
+}
+
+export async function getPublishedCircuitSnapshot(circuitId: string): Promise<CircuitSnapshot> {
+  return filterPublishedSnapshot(await getCircuitSnapshot(circuitId));
+}
+
+export async function getCircuitCatalog(): Promise<Circuit[]> {
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("circuits")
+      .select(
+        "id,slug,name,short_name,season,location,description,status,is_published,starts_at,ends_at,created_at,updated_at",
+      )
+      .order("updated_at", { ascending: false });
+
+    if (!error && data?.length) {
+      return data.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        shortName: row.short_name,
+        season: row.season,
+        location: row.location,
+        description: row.description,
+        status: row.status,
+        isPublished: row.is_published,
+        startsAt: row.starts_at ?? undefined,
+        endsAt: row.ends_at ?? undefined,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })) as Circuit[];
+    }
+  }
+
+  if (canUseLocalFileStorage()) {
+    try {
+      const circuits = JSON.parse(await readFile(LOCAL_CIRCUITS_PATH, "utf8")) as Circuit[];
+      return ensureLegacyCircuit(circuits);
+    } catch {
+      return [LEGACY_CIRCUIT];
+    }
+  }
+
+  return [LEGACY_CIRCUIT];
+}
+
+export async function getCircuitBySlug(slug: string) {
+  return (await getCircuitCatalog()).find((circuit) => circuit.slug === slug);
+}
+
+export async function getSelectedCircuit() {
+  const circuitId = await getSelectedCircuitId();
+  return (await getCircuitCatalog()).find((circuit) => circuit.id === circuitId) ?? LEGACY_CIRCUIT;
+}
+
+export async function createCircuit(
+  payload: Pick<Circuit, "name" | "shortName" | "season" | "location" | "description"> & {
+    startsAt?: string;
+    endsAt?: string;
+  },
+) {
+  const name = payload.name.trim();
+  const baseSlug = slugifyCircuitName(`${name}-${payload.season}`) || `circuito-${Date.now()}`;
+  const id = `circuit-${randomUUID()}`;
+  const now = new Date().toISOString();
+  const circuit: Circuit = {
+    id,
+    slug: baseSlug,
+    name,
+    shortName: payload.shortName.trim() || name,
+    season: payload.season.trim(),
+    location: payload.location.trim(),
+    description: payload.description.trim(),
+    status: "borrador",
+    isPublished: false,
+    startsAt: payload.startsAt || undefined,
+    endsAt: payload.endsAt || undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("circuits")
+      .insert(toCircuitDatabaseRow(circuit))
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ...circuit, id: data.id as string };
+  }
+
+  const catalog = await getCircuitCatalog();
+  circuit.slug = uniqueSlug(baseSlug, catalog);
+  await saveLocalCatalog([circuit, ...catalog]);
+  await saveLocalSnapshot(emptyCircuitSnapshot(), circuit.id);
+  return circuit;
+}
+
+export async function updateCircuit(
+  circuitId: string,
+  patch: Partial<Pick<Circuit, "name" | "shortName" | "season" | "location" | "description" | "status" | "isPublished" | "startsAt" | "endsAt">>,
+) {
+  const catalog = await getCircuitCatalog();
+  const current = catalog.find((circuit) => circuit.id === circuitId);
+  if (!current) throw new Error("Circuito no encontrado.");
+
+  const definedPatch = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) as typeof patch;
+  const updated: Circuit = {
+    ...current,
+    ...definedPatch,
+    updatedAt: new Date().toISOString(),
+  };
+  if (updated.status === "borrador") updated.isPublished = false;
+  if (definedPatch.isPublished === true && updated.status === "borrador") {
+    throw new Error("Marque el circuito como activo antes de publicarlo.");
+  }
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    const { error } = await supabase.from("circuits").update(toCircuitDatabaseRow(updated)).eq("id", circuitId);
+    if (error) throw new Error(error.message);
+    return updated;
+  }
+
+  await saveLocalCatalog(catalog.map((circuit) => (circuit.id === circuitId ? updated : circuit)));
+  return updated;
+}
+
+export async function createTournament(
+  circuitId: string,
+  payload: { name: string; round: number; date: string },
+) {
+  const supabase = getSupabaseAdminClient();
+  const tournament: CircuitDate = {
+    id: `tournament-${randomUUID()}`,
+    circuitId,
+    name: payload.name.trim(),
+    round: payload.round,
+    date: payload.date,
+    status: "pendiente",
+  };
+
+  if (supabase) {
+    const { error } = await supabase.from("tournaments").insert({
+      id: tournament.id,
+      circuit_id: circuitId,
+      name: tournament.name,
+      round: tournament.round,
+      date: tournament.date,
+      status: tournament.status,
+    });
+    if (error) throw new Error(error.message);
+    return tournament;
+  }
+
+  const snapshot = await getLocalSnapshot(circuitId);
+  if (snapshot.dates.some((date) => date.round === tournament.round)) {
+    throw new Error("Ya existe una fecha con ese numero dentro del circuito.");
+  }
+  snapshot.dates.push(tournament);
+  snapshot.dates.sort((a, b) => a.round - b.round);
+  await saveLocalSnapshot(snapshot, circuitId);
+  return tournament;
+}
+
+export async function updateTournament(
+  circuitId: string,
+  tournamentId: string,
+  patch: Partial<Pick<CircuitDate, "name" | "round" | "date" | "status">>,
+  actorEmail?: string,
+) {
+  const snapshot = await getCircuitSnapshot(circuitId);
+  const current = snapshot.dates.find((date) => date.id === tournamentId);
+  if (!current) throw new Error("Fecha no encontrada dentro del circuito seleccionado.");
+
+  if (patch.status === "cerrada") {
+    const resultCount = snapshot.importedResults.filter((result) => result.tournamentId === tournamentId).length;
+    if (!resultCount) throw new Error("Cargue y revise al menos un resultado antes de publicar la fecha.");
+  }
+
+  const updated: CircuitDate = {
+    ...current,
+    ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+  };
+  const duplicateRound = snapshot.dates.some(
+    (date) => date.id !== tournamentId && date.round === updated.round,
+  );
+  if (duplicateRound) throw new Error("Ya existe otra fecha con ese número dentro del circuito.");
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ name: updated.name, round: updated.round, date: updated.date, status: updated.status })
+      .eq("id", tournamentId)
+      .eq("circuit_id", circuitId);
+    if (error) throw new Error(error.message);
+
+    const { error: auditError } = await supabase.from("audit_logs").insert({
+      action: updated.status === "cerrada" ? "tournament.published" : "tournament.updated",
+      entity_type: "tournaments",
+      entity_id: tournamentId,
+      actor_email: actorEmail ?? "admin",
+      summary: updated.status === "cerrada" ? `${updated.name} publicada.` : `${updated.name} actualizada.`,
+      metadata: { circuitId, tournamentId, status: updated.status },
+    });
+    if (auditError) throw new Error(auditError.message);
+    return updated;
+  }
+
+  snapshot.dates = snapshot.dates
+    .map((date) => (date.id === tournamentId ? updated : date))
+    .toSorted((a, b) => a.round - b.round);
+  snapshot.auditLogs = [
+    {
+      id: `audit-${randomUUID()}`,
+      action: updated.status === "cerrada" ? "tournament.published" : "tournament.updated",
+      entityType: "tournaments",
+      entityId: tournamentId,
+      actorEmail: actorEmail ?? "admin",
+      summary: updated.status === "cerrada" ? `${updated.name} publicada.` : `${updated.name} actualizada.`,
+      createdAt: new Date().toISOString(),
+      metadata: { circuitId, tournamentId, status: updated.status },
+    },
+    ...snapshot.auditLogs,
+  ];
+  await saveLocalSnapshot(snapshot, circuitId);
+  return updated;
+}
+
+async function getSelectedCircuitId() {
+  const catalog = await getCircuitCatalog();
+  try {
+    const selected = (await cookies()).get(ADMIN_CIRCUIT_COOKIE)?.value;
+    if (selected && catalog.some((circuit) => circuit.id === selected)) return selected;
+  } catch {
+    // There is no request cookie store in unit tests and build-time utilities.
+  }
+  return catalog.find((circuit) => circuit.status !== "finalizado")?.id ?? catalog[0]?.id ?? LEGACY_CIRCUIT_ID;
+}
+
+function ensureLegacyCircuit(circuits: Circuit[]) {
+  return circuits.some((circuit) => circuit.id === LEGACY_CIRCUIT_ID) ? circuits : [...circuits, LEGACY_CIRCUIT];
+}
+
+function uniqueSlug(base: string, circuits: Circuit[]) {
+  if (!circuits.some((circuit) => circuit.slug === base)) return base;
+  let suffix = 2;
+  while (circuits.some((circuit) => circuit.slug === `${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+async function saveLocalCatalog(circuits: Circuit[]) {
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_CIRCUITS_PATH, JSON.stringify(ensureLegacyCircuit(circuits), null, 2), "utf8");
+}
+
+function toCircuitDatabaseRow(circuit: Circuit) {
+  return {
+    id: circuit.id,
+    slug: circuit.slug,
+    name: circuit.name,
+    short_name: circuit.shortName,
+    season: circuit.season,
+    location: circuit.location,
+    description: circuit.description,
+    status: circuit.status,
+    is_published: circuit.isPublished,
+    starts_at: circuit.startsAt ?? null,
+    ends_at: circuit.endsAt ?? null,
+    updated_at: circuit.updatedAt,
   };
 }
 
@@ -797,13 +1110,13 @@ export async function confirmMixedImport(
     const branchRows = payload.rows
       .filter((row) => row.branchId === branchId)
       .sort((a, b) => (a.place ?? 9999) - (b.place ?? 9999))
-      .slice(0, 10)
       .map((row, index) => ({
         ...row,
         place: index + 1,
       }));
 
     if (!branchRows.length) {
+      replacedRows += await clearImportScope(payload.tournamentId, payload.categoryId, branchId);
       continue;
     }
 
@@ -827,22 +1140,23 @@ export async function confirmMixedImport(
   };
 }
 
-async function getLocalSnapshot(): Promise<CircuitSnapshot> {
+async function getLocalSnapshot(circuitId?: string): Promise<CircuitSnapshot> {
+  const selectedCircuitId = circuitId ?? (await getSelectedCircuitId());
   if (!canUseLocalFileStorage()) {
-    return structuredClone(demoSnapshot);
+    return selectedCircuitId === LEGACY_CIRCUIT_ID ? structuredClone(demoSnapshot) : emptyCircuitSnapshot();
   }
 
   try {
-    const raw = await readFile(LOCAL_SNAPSHOT_PATH, "utf8");
+    const raw = await readFile(localSnapshotPath(selectedCircuitId), "utf8");
     return JSON.parse(raw) as CircuitSnapshot;
   } catch {
-    const seeded = structuredClone(demoSnapshot);
-    await saveLocalSnapshot(seeded);
+    const seeded = selectedCircuitId === LEGACY_CIRCUIT_ID ? structuredClone(demoSnapshot) : emptyCircuitSnapshot();
+    await saveLocalSnapshot(seeded, selectedCircuitId);
     return seeded;
   }
 }
 
-async function saveLocalSnapshot(snapshot: CircuitSnapshot) {
+async function saveLocalSnapshot(snapshot: CircuitSnapshot, circuitId?: string) {
   if (!canUseLocalFileStorage()) {
     throw new Error(
       `Supabase admin no configurado (${formatSupabaseConfigStatus()}). El almacenamiento local solo esta disponible en desarrollo.`,
@@ -850,7 +1164,59 @@ async function saveLocalSnapshot(snapshot: CircuitSnapshot) {
   }
 
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
-  await writeFile(LOCAL_SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2), "utf8");
+  const selectedCircuitId = circuitId ?? (await getSelectedCircuitId());
+  const snapshotPath = localSnapshotPath(selectedCircuitId);
+  await mkdir(path.dirname(snapshotPath), { recursive: true });
+  await writeFile(snapshotPath, JSON.stringify(snapshot, null, 2), "utf8");
+}
+
+function localSnapshotPath(circuitId: string) {
+  return circuitId === LEGACY_CIRCUIT_ID
+    ? LOCAL_SNAPSHOT_PATH
+    : path.join(LOCAL_DATA_DIR, "circuits", `${circuitId}.json`);
+}
+
+function emptyCircuitSnapshot(): CircuitSnapshot {
+  return {
+    categories: structuredClone(demoSnapshot.categories),
+    branches: structuredClone(demoSnapshot.branches),
+    dates: [],
+    schools: [],
+    players: [],
+    importedResults: [],
+    circuitPoints: [],
+    pointRules: structuredClone(DEFAULT_POINT_RULES),
+    auditLogs: [],
+  };
+}
+
+async function clearImportScope(
+  tournamentId: string,
+  categoryId: Category["id"],
+  branchId: Branch["id"],
+) {
+  const replacedRows = await countExistingResults(tournamentId, categoryId, branchId);
+  if (!replacedRows) return 0;
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    const scope = { tournament_id: tournamentId, category_id: categoryId, branch_id: branchId };
+    const { error: pointsError } = await supabase.from("circuit_points").delete().match(scope);
+    if (pointsError) throw new Error(pointsError.message);
+    const { error: resultsError } = await supabase.from("imported_results").delete().match(scope);
+    if (resultsError) throw new Error(resultsError.message);
+    return replacedRows;
+  }
+
+  const snapshot = await getLocalSnapshot();
+  snapshot.importedResults = snapshot.importedResults.filter((result) =>
+    !(result.tournamentId === tournamentId && result.categoryId === categoryId && result.branchId === branchId),
+  );
+  snapshot.circuitPoints = snapshot.circuitPoints?.filter((point) =>
+    !(point.tournamentId === tournamentId && point.categoryId === categoryId && point.branchId === branchId),
+  );
+  await saveLocalSnapshot(snapshot);
+  return replacedRows;
 }
 
 function formatSupabaseConfigStatus() {
@@ -1094,6 +1460,7 @@ async function upsertSchoolAlias(schoolId: string, alias: string) {
 function mapTournament(row: TournamentRow): CircuitDate {
   return {
     id: row.id,
+    circuitId: row.circuit_id ?? undefined,
     name: row.name,
     round: row.round,
     date: row.date,

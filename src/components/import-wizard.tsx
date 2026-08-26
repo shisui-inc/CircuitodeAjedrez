@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Plus, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, FileSpreadsheet, Plus, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,11 +34,15 @@ interface ImportWizardProps {
   branches: Branch[];
   initialRows: ImportRow[];
   existingResults: ImportedResult[];
+  initialTournamentId?: string;
 }
 
-export function ImportWizard({ dates, categories, branches, initialRows, existingResults }: ImportWizardProps) {
+export function ImportWizard({ dates, categories, branches, initialRows, existingResults, initialTournamentId }: ImportWizardProps) {
+  const router = useRouter();
   const [sourceUrl, setSourceUrl] = useState("");
-  const [tournamentId, setTournamentId] = useState(dates[0]?.id ?? "");
+  const [tournamentId, setTournamentId] = useState(
+    dates.some((date) => date.id === initialTournamentId) ? initialTournamentId! : dates[0]?.id ?? "",
+  );
   const [categoryId, setCategoryId] = useState<CategoryId>(categories[0]?.id ?? "sub-6");
   const [branchId, setBranchId] = useState<BranchId>(branches[0]?.id ?? "absoluto");
   const [mixedMode, setMixedMode] = useState(true);
@@ -89,8 +95,9 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
     }
   }
 
-  async function parseFile() {
-    if (!selectedFile) {
+  async function parseFile(fileOverride?: File) {
+    const file = fileOverride ?? selectedFile;
+    if (!file) {
       setStatus("Seleccione un archivo .xlsx.");
       return;
     }
@@ -101,7 +108,7 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
 
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", file);
 
       const response = await fetch("/api/import/parse-file", {
         method: "POST",
@@ -115,7 +122,9 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
 
       setRows(payload.rows ?? []);
       setWarnings(payload.warnings ?? []);
-      setSourceUrl(selectedFile.name);
+      setSourceUrl(file.name);
+      const inferredCategory = inferCategoryId(file.name, categories);
+      if (inferredCategory) setCategoryId(inferredCategory);
       setMixedMode(true);
       setStatusVariant("success");
       setStatus("Archivo leido con ramas sugeridas. Confirme o cambie cada rama antes de guardar.");
@@ -170,8 +179,9 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
       setStatusVariant("success");
       setStatus(
         `${payload.message ?? "Carga confirmada."} Filas guardadas: ${payload.savedRows ?? rows.length}. ` +
-          `Filas previas reemplazadas: ${payload.replacedRows ?? 0}.`,
+          `Filas previas reemplazadas: ${payload.replacedRows ?? 0}. La fecha quedó en revisión; publíquela desde Fechas y resultados.`,
       );
+      router.refresh();
     } catch (error) {
       setStatusVariant("error");
       setStatus(error instanceof Error ? error.message : "No se pudo confirmar la carga.");
@@ -208,30 +218,43 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-3 rounded-xl border bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button asChild variant="ghost" className="w-fit"><Link href="/admin/fechas"><ArrowLeft className="size-4" />Volver a fechas</Link></Button>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-xs font-semibold">
+          <Step number={1} label="Archivo" active={!rows.length} done={rows.length > 0} />
+          <span className="h-px w-5 bg-slate-200" />
+          <Step number={2} label="Revisar" active={rows.length > 0 && !status.includes("quedó en revisión")} done={status.includes("quedó en revisión")} />
+          <span className="h-px w-5 bg-slate-200" />
+          <Step number={3} label="Publicar" active={status.includes("quedó en revisión")} done={false} />
+        </div>
+      </div>
+
+      {!dates.length ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">Primero cree una fecha desde <Link className="font-bold underline" href="/admin/fechas">Fechas y resultados</Link>.</div> : null}
+
       <Card className="rounded-lg">
         <CardHeader>
-          <CardTitle>Importar desde Chess-Results</CardTitle>
-          <CardDescription>Seleccione el contexto de la fecha y pegue el link publico de la clasificacion final.</CardDescription>
+          <CardTitle>1. Seleccione la fecha y suba el Excel</CardTitle>
+          <CardDescription>El archivo se lee automáticamente. Si el nombre incluye “Sub 8”, “Sub 10”, etc., sugeriremos la categoría.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_auto]">
-          <div className="space-y-2 lg:col-span-5">
+        <CardContent className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+          <div className="space-y-2 lg:col-span-3">
             <Label htmlFor="file">Archivo Excel de Chess-Results / Swiss-Manager</Label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="file"
                 type="file"
                 accept=".xlsx"
-                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  setSelectedFile(file);
+                  if (file) void parseFile(file);
+                }}
               />
-              <Button variant="outline" onClick={parseFile} disabled={isParsing || !selectedFile}>
+              <Button variant="outline" onClick={() => void parseFile()} disabled={isParsing || !selectedFile}>
                 <FileSpreadsheet className="size-4" />
-                Leer Excel
+                {isParsing ? "Leyendo…" : "Volver a leer"}
               </Button>
             </div>
-          </div>
-          <div className="space-y-2 lg:col-span-1">
-            <Label htmlFor="sourceUrl">Link publico</Label>
-            <Input id="sourceUrl" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Fecha</Label>
@@ -278,22 +301,14 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end">
-            <Button
-              type="button"
-              variant={mixedMode ? "default" : "outline"}
-              className="w-full"
-              onClick={() => setMixedMode((value) => !value)}
-            >
-              {mixedMode ? "Mixto ON" : "Mixto OFF"}
-            </Button>
-          </div>
-          <div className="flex items-end">
-            <Button className="w-full lg:w-auto" onClick={parseSource} disabled={isParsing}>
-              <Upload className="size-4" />
-              {isParsing ? "Leyendo" : "Leer tabla"}
-            </Button>
-          </div>
+          <details className="rounded-lg border bg-stone-50 lg:col-span-3">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Opciones avanzadas: rama única o enlace público</summary>
+            <div className="grid gap-3 border-t p-4 sm:grid-cols-[auto_1fr_auto] sm:items-end">
+              <Button type="button" variant={mixedMode ? "default" : "outline"} onClick={() => setMixedMode((value) => !value)}>{mixedMode ? "Archivo mixto" : "Rama única"}</Button>
+              <div className="space-y-2"><Label htmlFor="sourceUrl">Enlace público de Chess-Results</Label><Input id="sourceUrl" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://chess-results.com/..." /></div>
+              <Button onClick={parseSource} disabled={isParsing || !sourceUrl.trim()}><Upload className="size-4" />Leer enlace</Button>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
@@ -337,8 +352,8 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
       <Card className="rounded-lg">
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle>Revision de importacion</CardTitle>
-            <CardDescription>Confirme o cambie la rama sugerida, y corrija puestos, colegios, jugadores y desempates antes de guardar.</CardDescription>
+            <CardTitle>2. Revise antes de guardar</CardTitle>
+            <CardDescription>Confirme la rama sugerida y corrija puestos, colegios o nombres. Guardar todavía no publica la fecha.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={addRow}>
@@ -361,7 +376,18 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
               </div>
             </div>
           ) : null}
-          <div className="overflow-x-auto rounded-lg border">
+          <div className="space-y-3 lg:hidden">
+            {rows.map((row, index) => (
+              <MobileRowEditor
+                key={row.tempId}
+                row={row}
+                index={index}
+                onChange={(patch) => updateRow(row.tempId, patch)}
+                onDelete={() => deleteRow(row.tempId)}
+              />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-lg border lg:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -446,10 +472,10 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
           </div>
           <div className="flex flex-col gap-3 rounded-lg bg-stone-100 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium">{rows.length} filas listas para revisar</p>
+              <p className="text-sm font-medium">{rows.length} filas listas para guardar</p>
               <p className="text-sm text-muted-foreground">
                 {mixedMode
-                  ? "El puesto general se conserva como fuente; al confirmar se recalcula el puesto por rama y solo el top 10 de cada rama suma."
+                  ? "El puesto general se conserva como fuente; al guardar se recalcula el puesto por rama. Todos los resultados quedan guardados y solo el top 10 suma puntos."
                   : "Solo los puestos 1 al 10 suman puntos; los colegios nuevos se crean al confirmar."}
               </p>
             </div>
@@ -463,14 +489,27 @@ export function ImportWizard({ dates, categories, branches, initialRows, existin
               }
             >
               <CheckCircle2 className="size-4" />
-              Confirmar carga
+              Guardar para revisión
             </Button>
           </div>
           {status ? <p className={statusClassName(statusVariant)}>{status}</p> : null}
+          {statusVariant === "success" && status.includes("quedó en revisión") ? <Button asChild className="w-full sm:w-auto"><Link href="/admin/fechas"><CheckCircle2 className="size-4" />Ir a revisar y publicar la fecha</Link></Button> : null}
         </CardContent>
       </Card>
     </div>
   );
+}
+
+function Step({ number, label, active, done }: { number: number; label: string; active: boolean; done: boolean }) {
+  return <span className={`inline-flex items-center gap-1.5 ${active || done ? "text-emerald-800" : "text-slate-400"}`}><span className={`flex size-5 items-center justify-center rounded-full ${active || done ? "bg-emerald-100" : "bg-slate-100"}`}>{done ? <Check className="size-3" /> : number}</span><span className="hidden sm:inline">{label}</span></span>;
+}
+
+function inferCategoryId(fileName: string, categories: Category[]): CategoryId | undefined {
+  const normalized = fileName.toLowerCase().replace(/[_-]+/g, " ");
+  return categories.find((category) => {
+    const number = category.id.match(/\d+/)?.[0];
+    return number ? new RegExp(`(?:sub|u)\\s*${number}\\b`).test(normalized) : /abierto|open/.test(normalized);
+  })?.id;
 }
 
 function buildBranchPreview(rows: ImportRow[]) {
@@ -548,6 +587,36 @@ function PreviewPanel({
         )}
       </div>
     </div>
+  );
+}
+
+function MobileRowEditor({
+  row,
+  index,
+  onChange,
+  onDelete,
+}: {
+  row: ImportRow;
+  index: number;
+  onChange: (patch: Partial<ImportRow>) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <details className="rounded-xl border bg-white" open={index < 3}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+        <span className="min-w-0"><span className="block truncate font-semibold">{row.playerName || `Fila ${index + 1}`}</span><span className="text-xs text-muted-foreground">Puesto {row.place ?? "pendiente"} · {row.schoolName || "Sin colegio"}</span></span>
+        <Badge variant={row.branchId === "pendiente" || !row.branchId ? "destructive" : "secondary"}>{row.branchId ?? "pendiente"}</Badge>
+      </summary>
+      <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
+        <div className="space-y-1.5"><Label>Puesto general</Label><Input inputMode="numeric" value={row.place ?? ""} onChange={(event) => onChange({ place: event.target.value ? Number(event.target.value) : null })} /></div>
+        <div className="space-y-1.5"><Label>Rama</Label><Select value={row.branchId ?? "pendiente"} onValueChange={(value) => onChange({ branchId: value as ImportRow["branchId"] })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pendiente">Pendiente</SelectItem><SelectItem value="absoluto">Absoluto</SelectItem><SelectItem value="femenino">Femenino</SelectItem></SelectContent></Select></div>
+        <div className="space-y-1.5 sm:col-span-2"><Label>Jugador</Label><Input value={row.playerName} onChange={(event) => onChange({ playerName: event.target.value })} /></div>
+        <div className="space-y-1.5 sm:col-span-2"><Label>Colegio</Label><Input value={row.schoolName} placeholder="Colegio" onChange={(event) => onChange({ schoolName: event.target.value })} /></div>
+        <div className="space-y-1.5"><Label>Puntos del torneo</Label><Input inputMode="decimal" value={row.tournamentPoints} onChange={(event) => onChange({ tournamentPoints: Number(event.target.value.replace(",", ".")) || 0 })} /></div>
+        <div className="space-y-1.5"><Label>Desempates</Label><Textarea className="min-h-10" value={tieBreaksToText(row.tieBreaks)} onChange={(event) => onChange({ tieBreaks: textToTieBreaks(event.target.value) })} /></div>
+        <Button type="button" variant="ghost" className="text-red-700 sm:col-span-2" onClick={onDelete}><Trash2 className="size-4" />Eliminar fila</Button>
+      </div>
+    </details>
   );
 }
 

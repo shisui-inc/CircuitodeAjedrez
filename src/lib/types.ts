@@ -10,11 +10,33 @@ export type BranchId = "absoluto" | "femenino";
 
 export type TournamentStatus = "pendiente" | "importada" | "cerrada";
 
+export type CircuitStatus = "borrador" | "activo" | "finalizado";
+
+export interface Circuit {
+  id: string;
+  slug: string;
+  name: string;
+  shortName: string;
+  season: string;
+  location: string;
+  description: string;
+  status: CircuitStatus;
+  isPublished: boolean;
+  startsAt?: string;
+  endsAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  tournamentCount?: number;
+  playerCount?: number;
+  resultCount?: number;
+}
+
 export type ValidationIssueType =
   | "duplicate-place"
   | "missing-school"
   | "duplicate-player"
   | "similar-player"
+  | "missing-player"
   | "missing-place";
 
 export interface Category {
@@ -31,6 +53,7 @@ export interface Branch {
 
 export interface CircuitDate {
   id: string;
+  circuitId?: string;
   name: string;
   round: number;
   date: string;

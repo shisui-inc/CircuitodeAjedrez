@@ -219,13 +219,20 @@ function compareIndividualRows(a: IndividualRankingRow, b: IndividualRankingRow)
 }
 
 function compareSchoolRows(a: SchoolRankingRow, b: SchoolRankingRow) {
+  const libreComparison = Number(isLibreSchool(a.schoolName)) - Number(isLibreSchool(b.schoolName));
+
   return (
+    libreComparison ||
     b.totalPoints - a.totalPoints ||
     b.firstPlaces - a.firstPlaces ||
     b.podiums - a.podiums ||
     b.datesWithPoints - a.datesWithPoints ||
     a.schoolName.localeCompare(b.schoolName, "es")
   );
+}
+
+function isLibreSchool(schoolName: string) {
+  return normalizeText(schoolName) === "libre";
 }
 
 function compareRecentPlace(a: number | null, b: number | null) {

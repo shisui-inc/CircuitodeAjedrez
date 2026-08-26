@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { demoSnapshot } from "@/lib/demo-data";
+import { buildCupoSudamericanoSheet } from "@/lib/cupo-report";
+import { toCsv } from "@/lib/exporters";
 import { buildCircuitPoints, computeIndividualRankings, computeSchoolRankings } from "@/lib/rankings";
 import { validateImportRows } from "@/lib/normalize";
+import { filterPublishedSnapshot } from "@/lib/publication";
 import type { CircuitSnapshot, ImportRow } from "@/lib/types";
 
 const rankingSnapshot: CircuitSnapshot = {
@@ -79,6 +82,41 @@ describe("rankings", () => {
     expect(rows[0].playersWithPoints).toBeGreaterThan(1);
   });
 
+  it("ubica libre al final del ranking de colegios", () => {
+    const snapshot: CircuitSnapshot = {
+      ...rankingSnapshot,
+      schools: [
+        ...rankingSnapshot.schools,
+        {
+          id: "school-libre",
+          officialName: "Libre",
+          normalizedName: "libre",
+          aliases: [],
+        },
+      ],
+      players: [
+        ...rankingSnapshot.players,
+        {
+          id: "player-libre",
+          fullName: "Jugador Libre",
+          normalizedName: "jugador libre",
+          schoolId: "school-libre",
+        },
+      ],
+      importedResults: [
+        ...rankingSnapshot.importedResults,
+        result("r-libre-1", "fecha-1", "player-libre", "school-libre", "Jugador Libre", "Libre", 1),
+        result("r-libre-2", "fecha-2", "player-libre", "school-libre", "Jugador Libre", "Libre", 1),
+        result("r-libre-3", "fecha-3", "player-libre", "school-libre", "Jugador Libre", "Libre", 1),
+      ],
+    };
+
+    const rows = computeSchoolRankings(snapshot);
+
+    expect(rows.at(-1)?.schoolName).toBe("Libre");
+    expect(rows.at(-1)?.totalPoints).toBeGreaterThan(rows[0].totalPoints);
+  });
+
   it("agrupa el ranking individual por nombre aunque el jugador tenga ids distintos", () => {
     const snapshot: CircuitSnapshot = {
       ...rankingSnapshot,
@@ -117,6 +155,46 @@ describe("rankings", () => {
     expect(mateoRows[0].datesPlayed).toBe(3);
     expect(mateoRows[0].schoolName).toBe("Colegio Nuevo");
   });
+
+  it("genera el reporte interno de cupo con titular, alterno y sin Sub 6", () => {
+    const snapshot: CircuitSnapshot = {
+      ...rankingSnapshot,
+      schools: [
+        ...rankingSnapshot.schools,
+        {
+          id: "school-tercero",
+          officialName: "Colegio Tercero",
+          normalizedName: "colegio tercero",
+          aliases: [],
+        },
+      ],
+      players: [
+        ...rankingSnapshot.players,
+        {
+          id: "player-tercero",
+          fullName: "Tercer Alumno",
+          normalizedName: "tercer alumno",
+          schoolId: "school-tercero",
+        },
+      ],
+      importedResults: [
+        ...rankingSnapshot.importedResults,
+        result("r6", "fecha-3", "player-tercero", "school-tercero", "Tercer Alumno", "Colegio Tercero", 1),
+        {
+          ...result("sub6-1", "fecha-1", "player-tercero", "school-tercero", "Tercer Alumno", "Colegio Tercero", 1),
+          categoryId: "sub-6",
+        },
+      ],
+    };
+
+    const csv = toCsv(buildCupoSudamericanoSheet(snapshot));
+
+    expect(csv).toContain("Cupo sudamericano acumulado - Control interno");
+    expect(csv).toContain("Colegio titular del cupo");
+    expect(csv).toContain("Alterno si el titular no puede hacer usufructo del cupo");
+    expect(csv).toContain("Diego Acosta");
+    expect(csv).not.toContain("Detalle - Categoria Sub 6");
+  });
 });
 
 describe("validateImportRows", () => {
@@ -131,6 +209,24 @@ describe("validateImportRows", () => {
     expect(issues.some((issue) => issue.type === "duplicate-place")).toBe(true);
     expect(issues.some((issue) => issue.type === "missing-school")).toBe(true);
     expect(issues.some((issue) => issue.type === "similar-player")).toBe(true);
+  });
+});
+
+describe("publicación de fechas", () => {
+  it("excluye del portal los resultados que siguen en revisión", () => {
+    const snapshot: CircuitSnapshot = {
+      ...rankingSnapshot,
+      dates: rankingSnapshot.dates.map((date, index) => ({
+        ...date,
+        status: index === 0 ? "cerrada" as const : "importada" as const,
+      })),
+    };
+
+    const published = filterPublishedSnapshot(snapshot);
+
+    expect(published.dates).toHaveLength(1);
+    expect(published.importedResults.every((result) => result.tournamentId === published.dates[0].id)).toBe(true);
+    expect(published.auditLogs).toHaveLength(0);
   });
 });
 

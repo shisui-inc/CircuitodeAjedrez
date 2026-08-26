@@ -3,15 +3,16 @@ import { getCircuitSnapshot } from "@/lib/server/repository";
 
 export const dynamic = "force-dynamic";
 
-export default async function ImportPage() {
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+  const { date } = await searchParams;
   const snapshot = await getCircuitSnapshot();
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-normal">Importar Chess-Results</h2>
+        <h2 className="text-2xl font-semibold tracking-normal">Cargar y revisar resultados</h2>
         <p className="text-sm text-muted-foreground">
-          Lea una clasificacion final, revise los datos y confirme la carga para actualizar rankings.
+          Suba el Excel, revise los datos detectados y guarde la carga. La fecha seguirá privada hasta que la publique.
         </p>
       </div>
       <ImportWizard
@@ -20,6 +21,7 @@ export default async function ImportPage() {
         branches={snapshot.branches}
         initialRows={[]}
         existingResults={snapshot.importedResults}
+        initialTournamentId={date}
       />
     </div>
   );

@@ -107,6 +107,15 @@ export function validateImportRows(rows: ImportRow[]): ValidationIssue[] {
   const players = new Map<string, string[]>();
 
   for (const row of rows) {
+    if (!row.playerName.trim()) {
+      issues.push({
+        type: "missing-player",
+        message: "Falta el nombre de un jugador.",
+        rowIds: [row.tempId],
+        severity: "error",
+      });
+    }
+
     if (!row.place) {
       issues.push({
         type: "missing-place",
@@ -150,7 +159,7 @@ export function validateImportRows(rows: ImportRow[]): ValidationIssue[] {
         type: "duplicate-player",
         message: `El jugador "${playerName}" aparece repetido.`,
         rowIds,
-        severity: "warning",
+        severity: "error",
       });
     }
   }

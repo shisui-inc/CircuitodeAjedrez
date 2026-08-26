@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  CalendarDays,
+  CircuitBoard,
   ClipboardCheck,
   FilePenLine,
   FileDown,
@@ -17,21 +17,21 @@ import {
   Settings,
   ShieldCheck,
   Trophy,
-  Upload,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { Circuit } from "@/lib/types";
 
 const navigation = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/importar", label: "Importar Chess-Results", icon: Upload },
-  { href: "/admin/revision", label: "Revision de importacion", icon: ClipboardCheck },
+  { href: "/admin/fechas", label: "Fechas y resultados", icon: ClipboardCheck },
+  { href: "/admin/circuitos", label: "Circuitos y publicación", icon: CircuitBoard },
+  { href: "/admin/dashboard", label: "Resumen y rankings", icon: LayoutDashboard },
   { href: "/admin/correcciones", label: "Correcciones", icon: FilePenLine },
-  { href: "/admin/fechas", label: "Fechas", icon: CalendarDays },
   { href: "/admin/jugadores", label: "Jugadores", icon: Users },
   { href: "/admin/colegios", label: "Colegios", icon: School },
   { href: "/admin/auditoria", label: "Auditoria", icon: ShieldCheck },
@@ -41,7 +41,7 @@ const navigation = [
   { href: "/admin/reportes", label: "Reportes / Exportar", icon: FileDown },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, circuits, selectedCircuit }: { children: React.ReactNode; circuits: Circuit[]; selectedCircuit: Circuit }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -49,6 +49,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     await getSupabaseBrowserClient()?.auth.signOut();
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
+    router.refresh();
+  }
+
+  async function selectCircuit(circuitId: string) {
+    await fetch("/api/admin/circuit-selection", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ circuitId }),
+    });
     router.refresh();
   }
 
@@ -71,11 +80,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SheetContent>
           </Sheet>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-muted-foreground">Circuito Escolar de Ajedrez Paranaense</p>
+            <p className="truncate text-sm text-muted-foreground">{selectedCircuit.name}</p>
             <h1 className="truncate text-base font-semibold">Panel administrativo</h1>
           </div>
+          <Select value={selectedCircuit.id} onValueChange={selectCircuit}>
+            <SelectTrigger className="w-36 bg-white sm:w-48 md:w-56" aria-label="Circuito administrado">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {circuits.map((circuit) => <SelectItem key={circuit.id} value={circuit.id}>{circuit.shortName} · {circuit.status}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Button asChild variant="outline" className="hidden sm:inline-flex">
-            <Link href="/rankings">
+            <Link href={selectedCircuit.isPublished ? `/circuitos/${selectedCircuit.slug}` : "/rankings"}>
               <Globe2 className="size-4" />
               Pagina publica
             </Link>
@@ -104,7 +121,7 @@ function NavList({ pathname, onLogout }: { pathname: string; onLogout: () => voi
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-tight">Software oficial</p>
-            <p className="text-xs text-muted-foreground">del Circuito de Ajedrez Paranaense</p>
+            <p className="text-xs text-muted-foreground">Administrador de circuitos de ajedrez</p>
           </div>
         </div>
       </div>
