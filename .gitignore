@@ -36,6 +36,7 @@ devserver-*.log
 # local generated data/artifacts
 /.data/
 /outputs/
+/tmp/
 /.codex_spreadsheet_work/
 /supabase/.temp/
 

@@ -8,12 +8,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!(await hasAdminSession(request))) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
     const { id } = await params;
     const body = (await request.json()) as Partial<Circuit>;
+    if (body.categoryScheme && !(["pares", "impares"] as const).includes(body.categoryScheme)) {
+      return NextResponse.json({ error: "El esquema debe ser Pares o Impares." }, { status: 400 });
+    }
+    if (body.modality && !(["online", "presencial", "hibrido"] as const).includes(body.modality)) {
+      return NextResponse.json({ error: "Modalidad inválida." }, { status: 400 });
+    }
     const circuit = await updateCircuit(id, {
       name: body.name,
       shortName: body.shortName,
       season: body.season,
       location: body.location,
       description: body.description,
+      categoryScheme: body.categoryScheme,
+      modality: body.modality,
+      logoUrl: body.logoUrl,
+      instagramUrl: body.instagramUrl,
+      facebookUrl: body.facebookUrl,
       status: body.status,
       isPublished: body.isPublished,
       startsAt: body.startsAt,

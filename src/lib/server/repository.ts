@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { cookies } from "next/headers";
-import { DEFAULT_POINT_RULES } from "@/lib/circuit";
+import { DEFAULT_POINT_RULES, getCategoriesForScheme } from "@/lib/circuit";
 import { LEGACY_CIRCUIT, LEGACY_CIRCUIT_ID, slugifyCircuitName } from "@/lib/circuits";
 import { demoSnapshot } from "@/lib/demo-data";
 import { getCircuitPoints } from "@/lib/circuit";
@@ -103,10 +103,12 @@ interface AuditRow {
 
 export async function getCircuitSnapshot(circuitId?: string): Promise<CircuitSnapshot> {
   const selectedCircuitId = circuitId ?? (await getSelectedCircuitId());
+  const selectedCircuit = (await getCircuitCatalog()).find((circuit) => circuit.id === selectedCircuitId);
+  const configuredCategories = getCategoriesForScheme(selectedCircuit?.categoryScheme ?? "pares");
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    return getLocalSnapshot(selectedCircuitId);
+    return { ...(await getLocalSnapshot(selectedCircuitId)), categories: configuredCategories };
   }
 
   const { data: tournamentCircuitRows } = await supabase.from("tournaments").select("id,circuit_id");
@@ -182,12 +184,7 @@ export async function getCircuitSnapshot(circuitId?: string): Promise<CircuitSna
   const schoolIds = new Set(importedResults.map((result) => result.schoolId));
 
   return {
-    categories:
-      categoriesResponse.data?.map((row) => ({
-        id: row.id,
-        name: row.name,
-        sortOrder: row.sort_order,
-      })) ?? demoSnapshot.categories,
+    categories: configuredCategories,
     branches:
       branchesResponse.data?.map((row) => ({
         id: row.id,
@@ -227,7 +224,7 @@ export async function getCircuitCatalog(): Promise<Circuit[]> {
     const { data, error } = await supabase
       .from("circuits")
       .select(
-        "id,slug,name,short_name,season,location,description,status,is_published,starts_at,ends_at,created_at,updated_at",
+        "id,slug,name,short_name,season,location,description,category_scheme,modality,logo_url,instagram_url,facebook_url,status,is_published,starts_at,ends_at,created_at,updated_at",
       )
       .order("updated_at", { ascending: false });
 
@@ -240,6 +237,11 @@ export async function getCircuitCatalog(): Promise<Circuit[]> {
         season: row.season,
         location: row.location,
         description: row.description,
+        categoryScheme: row.category_scheme ?? "pares",
+        modality: row.modality ?? "presencial",
+        logoUrl: row.logo_url ?? undefined,
+        instagramUrl: row.instagram_url ?? undefined,
+        facebookUrl: row.facebook_url ?? undefined,
         status: row.status,
         isPublished: row.is_published,
         startsAt: row.starts_at ?? undefined,
@@ -272,9 +274,12 @@ export async function getSelectedCircuit() {
 }
 
 export async function createCircuit(
-  payload: Pick<Circuit, "name" | "shortName" | "season" | "location" | "description"> & {
+  payload: Pick<Circuit, "name" | "shortName" | "season" | "location" | "description" | "categoryScheme" | "modality"> & {
     startsAt?: string;
     endsAt?: string;
+    logoUrl?: string;
+    instagramUrl?: string;
+    facebookUrl?: string;
   },
 ) {
   const name = payload.name.trim();
@@ -289,6 +294,11 @@ export async function createCircuit(
     season: payload.season.trim(),
     location: payload.location.trim(),
     description: payload.description.trim(),
+    categoryScheme: payload.categoryScheme,
+    modality: payload.modality,
+    logoUrl: payload.logoUrl?.trim() || undefined,
+    instagramUrl: payload.instagramUrl?.trim() || undefined,
+    facebookUrl: payload.facebookUrl?.trim() || undefined,
     status: "borrador",
     isPublished: false,
     startsAt: payload.startsAt || undefined,
@@ -317,11 +327,18 @@ export async function createCircuit(
 
 export async function updateCircuit(
   circuitId: string,
-  patch: Partial<Pick<Circuit, "name" | "shortName" | "season" | "location" | "description" | "status" | "isPublished" | "startsAt" | "endsAt">>,
+  patch: Partial<Pick<Circuit, "name" | "shortName" | "season" | "location" | "description" | "categoryScheme" | "modality" | "logoUrl" | "instagramUrl" | "facebookUrl" | "status" | "isPublished" | "startsAt" | "endsAt">>,
 ) {
   const catalog = await getCircuitCatalog();
   const current = catalog.find((circuit) => circuit.id === circuitId);
   if (!current) throw new Error("Circuito no encontrado.");
+
+  if (patch.categoryScheme && patch.categoryScheme !== current.categoryScheme) {
+    const snapshot = await getCircuitSnapshot(circuitId);
+    if (snapshot.importedResults.length > 0) {
+      throw new Error("No se puede cambiar el esquema Par/Impar porque el circuito ya tiene resultados. Cree otro circuito o vacíe primero sus cargas.");
+    }
+  }
 
   const definedPatch = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) as typeof patch;
   const updated: Circuit = {
@@ -459,7 +476,18 @@ async function getSelectedCircuitId() {
 }
 
 function ensureLegacyCircuit(circuits: Circuit[]) {
-  return circuits.some((circuit) => circuit.id === LEGACY_CIRCUIT_ID) ? circuits : [...circuits, LEGACY_CIRCUIT];
+  const normalized = circuits.map(withCircuitDefaults);
+  return normalized.some((circuit) => circuit.id === LEGACY_CIRCUIT_ID)
+    ? normalized
+    : [...normalized, LEGACY_CIRCUIT];
+}
+
+function withCircuitDefaults(circuit: Circuit): Circuit {
+  return {
+    ...circuit,
+    categoryScheme: circuit.categoryScheme ?? "pares",
+    modality: circuit.modality ?? "presencial",
+  };
 }
 
 function uniqueSlug(base: string, circuits: Circuit[]) {
@@ -483,6 +511,11 @@ function toCircuitDatabaseRow(circuit: Circuit) {
     season: circuit.season,
     location: circuit.location,
     description: circuit.description,
+    category_scheme: circuit.categoryScheme,
+    modality: circuit.modality,
+    logo_url: circuit.logoUrl ?? null,
+    instagram_url: circuit.instagramUrl ?? null,
+    facebook_url: circuit.facebookUrl ?? null,
     status: circuit.status,
     is_published: circuit.isPublished,
     starts_at: circuit.startsAt ?? null,

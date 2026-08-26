@@ -4,7 +4,11 @@ insert into public.categories (id, name, sort_order) values
   ('sub-10', 'Sub 10', 3),
   ('sub-12', 'Sub 12', 4),
   ('sub-14', 'Sub 14', 5),
-  ('abierto', 'Abierto', 6)
+  ('abierto', 'Abierto', 6),
+  ('sub-7', 'Sub 7', 7),
+  ('sub-9', 'Sub 9', 8),
+  ('sub-11', 'Sub 11', 9),
+  ('sub-13', 'Sub 13', 10)
 on conflict (id) do update set name = excluded.name, sort_order = excluded.sort_order;
 
 insert into public.branches (id, name, sort_order) values

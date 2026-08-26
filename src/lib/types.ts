@@ -1,8 +1,12 @@
 export type CategoryId =
   | "sub-6"
+  | "sub-7"
   | "sub-8"
+  | "sub-9"
   | "sub-10"
+  | "sub-11"
   | "sub-12"
+  | "sub-13"
   | "sub-14"
   | "abierto";
 
@@ -11,6 +15,8 @@ export type BranchId = "absoluto" | "femenino";
 export type TournamentStatus = "pendiente" | "importada" | "cerrada";
 
 export type CircuitStatus = "borrador" | "activo" | "finalizado";
+export type CategoryScheme = "pares" | "impares";
+export type TournamentModality = "online" | "presencial" | "hibrido";
 
 export interface Circuit {
   id: string;
@@ -20,6 +26,11 @@ export interface Circuit {
   season: string;
   location: string;
   description: string;
+  categoryScheme: CategoryScheme;
+  modality: TournamentModality;
+  logoUrl?: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
   status: CircuitStatus;
   isPublished: boolean;
   startsAt?: string;

@@ -10,6 +10,8 @@ export const LEGACY_CIRCUIT: Circuit = {
   season: "2026",
   location: "Ciudad del Este, Paraguay",
   description: "Circuito escolar organizado por categorias y ramas, con resultados acumulados por fecha.",
+  categoryScheme: "pares",
+  modality: "presencial",
   status: "finalizado",
   isPublished: true,
   startsAt: "2026-03-14",

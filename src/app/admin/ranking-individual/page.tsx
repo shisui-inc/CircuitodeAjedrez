@@ -90,7 +90,7 @@ export default async function IndividualRankingPage({ searchParams }: PageProps)
 }
 
 function parseCategory(value?: string): CategoryId | "general" {
-  const allowed = ["sub-6", "sub-8", "sub-10", "sub-12", "sub-14", "abierto", "general"];
+  const allowed = ["sub-6", "sub-7", "sub-8", "sub-9", "sub-10", "sub-11", "sub-12", "sub-13", "sub-14", "abierto", "general"];
   return allowed.includes(value ?? "") ? (value as CategoryId | "general") : "general";
 }
 

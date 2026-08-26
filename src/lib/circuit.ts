@@ -1,6 +1,6 @@
-import type { Branch, Category, PointRule } from "@/lib/types";
+import type { Branch, Category, CategoryScheme, PointRule } from "@/lib/types";
 
-export const CATEGORIES: Category[] = [
+export const EVEN_CATEGORIES: Category[] = [
   { id: "sub-6", name: "Sub 6", sortOrder: 1 },
   { id: "sub-8", name: "Sub 8", sortOrder: 2 },
   { id: "sub-10", name: "Sub 10", sortOrder: 3 },
@@ -8,6 +8,26 @@ export const CATEGORIES: Category[] = [
   { id: "sub-14", name: "Sub 14", sortOrder: 5 },
   { id: "abierto", name: "Abierto", sortOrder: 6 },
 ];
+
+export const ODD_CATEGORIES: Category[] = [
+  { id: "sub-7", name: "Sub 7", sortOrder: 1 },
+  { id: "sub-9", name: "Sub 9", sortOrder: 2 },
+  { id: "sub-11", name: "Sub 11", sortOrder: 3 },
+  { id: "sub-13", name: "Sub 13", sortOrder: 4 },
+  { id: "abierto", name: "Abierto", sortOrder: 5 },
+];
+
+export const ALL_CATEGORIES: Category[] = [
+  ...EVEN_CATEGORIES.filter((category) => category.id !== "abierto"),
+  ...ODD_CATEGORIES.filter((category) => category.id !== "abierto"),
+  { id: "abierto", name: "Abierto", sortOrder: 99 },
+];
+
+export const CATEGORIES = EVEN_CATEGORIES;
+
+export function getCategoriesForScheme(scheme: CategoryScheme) {
+  return structuredClone(scheme === "impares" ? ODD_CATEGORIES : EVEN_CATEGORIES);
+}
 
 export const BRANCHES: Branch[] = [
   { id: "absoluto", name: "Absoluto", sortOrder: 1 },
@@ -28,7 +48,7 @@ export const DEFAULT_POINT_RULES: PointRule[] = [
 ];
 
 export function getCategoryName(categoryId: string) {
-  return CATEGORIES.find((category) => category.id === categoryId)?.name ?? categoryId;
+  return ALL_CATEGORIES.find((category) => category.id === categoryId)?.name ?? categoryId;
 }
 
 export function getBranchName(branchId: string) {

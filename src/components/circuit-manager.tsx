@@ -94,6 +94,10 @@ export function CircuitManager({ circuits, selectedCircuit, dates }: { circuits:
           <CardContent><form action={createCircuitAction} className="space-y-3">
             <Field label="Nombre completo" name="name" placeholder="Circuito Escolar del Este" required />
             <div className="grid grid-cols-2 gap-3"><Field label="Nombre corto" name="shortName" placeholder="Este 2027" /><Field label="Temporada" name="season" placeholder="2027" required /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <SelectField label="Categorías" name="categoryScheme" defaultValue="pares" options={[{ value: "pares", label: "Pares: Sub 6 a Sub 14" }, { value: "impares", label: "Impares: Sub 7 a Sub 13" }]} />
+              <SelectField label="Modalidad" name="modality" defaultValue="presencial" options={[{ value: "presencial", label: "Presencial" }, { value: "online", label: "Online / Lichess" }, { value: "hibrido", label: "Híbrido" }]} />
+            </div>
             <Field label="Ubicación" name="location" placeholder="Alto Paraná, Paraguay" />
             <div className="grid grid-cols-2 gap-3"><Field label="Inicio" name="startsAt" type="date" /><Field label="Final" name="endsAt" type="date" /></div>
             <div className="space-y-1.5"><Label htmlFor="description">Descripción</Label><Textarea id="description" name="description" placeholder="Información que verán jugadores y familias." /></div>
@@ -142,6 +146,7 @@ export function CircuitManager({ circuits, selectedCircuit, dates }: { circuits:
 }
 
 function Field(props: React.ComponentProps<typeof Input> & { label: string }) { const { label, ...inputProps } = props; return <div className="space-y-1.5"><Label htmlFor={inputProps.name}>{label}</Label><Input id={inputProps.name} {...inputProps} /></div>; }
+function SelectField({ label, name, defaultValue, options }: { label: string; name: string; defaultValue: string; options: Array<{ value: string; label: string }> }) { return <div className="space-y-1.5"><Label htmlFor={name}>{label}</Label><select id={name} name={name} defaultValue={defaultValue} className="h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>; }
 function StatusBadge({ status }: { status: CircuitStatus }) { return <Badge className={status === "activo" ? "bg-emerald-100 text-emerald-800" : status === "finalizado" ? "bg-slate-100 text-slate-700" : "bg-amber-100 text-amber-800"}>{status}</Badge>; }
 function LifecycleButton({ icon: Icon, label, active, ...props }: { icon: typeof Archive; label: string; active: boolean } & React.ComponentProps<typeof Button>) { return <Button type="button" variant={active ? "default" : "outline"} className="justify-start" {...props}><Icon className="size-4" />{label}{active ? <Check className="ml-auto size-4" /> : null}</Button>; }
 async function requestJson<T = unknown>(url: string, init: RequestInit) { const response = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init.headers } }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error ?? "Ocurrió un error."); return payload as T; }

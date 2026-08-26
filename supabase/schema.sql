@@ -8,6 +8,11 @@ create table if not exists public.circuits (
   season text not null,
   location text not null default '',
   description text not null default '',
+  category_scheme text not null default 'pares' check (category_scheme in ('pares', 'impares')),
+  modality text not null default 'presencial' check (modality in ('online', 'presencial', 'hibrido')),
+  logo_url text,
+  instagram_url text,
+  facebook_url text,
   status text not null default 'borrador' check (status in ('borrador', 'activo', 'finalizado')),
   is_published boolean not null default false,
   starts_at date,
@@ -37,6 +42,19 @@ create table if not exists public.categories (
   name text not null,
   sort_order integer not null unique
 );
+
+insert into public.categories (id, name, sort_order) values
+  ('sub-6', 'Sub 6', 1),
+  ('sub-8', 'Sub 8', 2),
+  ('sub-10', 'Sub 10', 3),
+  ('sub-12', 'Sub 12', 4),
+  ('sub-14', 'Sub 14', 5),
+  ('abierto', 'Abierto', 6),
+  ('sub-7', 'Sub 7', 7),
+  ('sub-9', 'Sub 9', 8),
+  ('sub-11', 'Sub 11', 9),
+  ('sub-13', 'Sub 13', 10)
+on conflict (id) do update set name = excluded.name;
 
 create table if not exists public.branches (
   id text primary key,
