@@ -15,8 +15,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Circuito Escolar de Ajedrez Paranaense",
-  description: "Administracion y rankings publicos del circuito escolar de ajedrez.",
+  metadataBase: new URL("https://circuitode-ajedrez.vercel.app"),
+  title: {
+    default: "Circuitos de Ajedrez | Paraguay juega",
+    template: "%s | Circuitos de Ajedrez",
+  },
+  description: "Torneos, resultados oficiales y rankings de ajedrez en un solo lugar, diseñado para jugadores y familias.",
+  applicationName: "Circuitos de Ajedrez",
+  keywords: ["ajedrez", "torneos de ajedrez", "ranking escolar", "ajedrez Paraguay", "resultados de ajedrez"],
+  openGraph: {
+    title: "Circuitos de Ajedrez | Paraguay juega",
+    description: "Encontrá tu torneo, seguí tus resultados y viví cada partida.",
+    url: "/rankings",
+    siteName: "Circuitos de Ajedrez",
+    locale: "es_PY",
+    type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Circuitos de Ajedrez — Tu torneo. Tu partida. Tu historia." }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Circuitos de Ajedrez | Paraguay juega",
+    description: "Encontrá tu torneo, seguí tus resultados y viví cada partida.",
+    images: ["/og.png"],
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

@@ -11,8 +11,12 @@ import {
   Eye,
   EyeOff,
   FileCheck2,
+  FileSpreadsheet,
+  Layers3,
   Pencil,
   RotateCcw,
+  Settings2,
+  ShieldCheck,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -125,6 +129,24 @@ export function DateOperations({ circuit, dates, categories, branches, results }
           </p>
         </div>
       ) : null}
+
+      <Card className="overflow-hidden border-sky-200 bg-sky-50/45">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><ShieldCheck className="size-5" /></span>
+              <div><p className="font-bold">{circuit.status === "finalizado" ? "Circuito archivado y protegido" : "Circuito listo para recibir datos"}</p><p className="mt-1 max-w-2xl text-sm text-muted-foreground">{circuit.status === "finalizado" ? "Los datos históricos se mantienen disponibles. Cámbielo a activo solamente si necesita agregar una nueva fecha." : "Cree una fecha y cargue el archivo por categoría. Nada aparecerá en la web hasta que usted revise y pulse Publicar."}</p></div>
+            </div>
+            <Button asChild variant="outline" size="sm" className="bg-white"><Link href="/admin/ajustes"><Settings2 className="size-4" />Revisar configuración</Link></Button>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <ReadyItem icon={Layers3} label="Categorías" value={circuit.categoryScheme === "impares" ? "Impares" : "Pares"} />
+            <ReadyItem icon={FileSpreadsheet} label="Archivos" value="XLSX · XLS · CSV" />
+            <ReadyItem icon={Upload} label="Carga" value="Por categoría" />
+            <ReadyItem icon={Eye} label="Publicación" value="Siempre manual" />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-emerald-200">
         <CardHeader>
@@ -270,6 +292,7 @@ function EditDateForm({ date, disabled, onSave }: { date: CircuitDate; disabled:
 }
 
 function SummaryValue({ value, label }: { value: number; label: string }) { return <div className="rounded-lg border bg-white px-3 py-2"><p className="text-lg font-bold">{value}</p><p className="text-[11px] text-muted-foreground">{label}</p></div>; }
+function ReadyItem({ icon: Icon, label, value }: { icon: typeof Upload; label: string; value: string }) { return <div className="rounded-xl border border-sky-100 bg-white px-3 py-3"><Icon className="size-4 text-sky-700" /><p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-0.5 text-sm font-bold">{value}</p></div>; }
 function Metric({ label, value, warning = false }: { label: string; value: number | string; warning?: boolean }) { return <div className={`rounded-lg px-3 py-2 ${warning ? "bg-amber-50 text-amber-900" : "bg-stone-100"}`}><p className="text-lg font-bold">{value}</p><p className="text-xs opacity-70">{label}</p></div>; }
 function Field(props: React.ComponentProps<typeof Input> & { label: string }) { const { label, ...inputProps } = props; return <div className="space-y-1.5"><Label htmlFor={`${inputProps.name}-${String(inputProps.defaultValue ?? "new")}`}>{label}</Label><Input id={`${inputProps.name}-${String(inputProps.defaultValue ?? "new")}`} {...inputProps} /></div>; }
 function StatusBadge({ status }: { status: TournamentStatus }) { const config = status === "cerrada" ? { label: "Publicada", className: "bg-emerald-100 text-emerald-800", icon: Eye } : status === "importada" ? { label: "En revisión", className: "bg-sky-100 text-sky-800", icon: FileCheck2 } : { label: "Pendiente", className: "bg-amber-100 text-amber-800", icon: CircleDot }; const Icon = config.icon; return <Badge className={config.className}><Icon className="size-3" />{config.label}</Badge>; }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, ChevronDown, MapPin, Search, School, Trophy, Users, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronDown, CircleDot, MapPin, Search, School, ShieldCheck, Trophy, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,46 +43,59 @@ export function PublicCircuitView({
   }, [normalizedQuery, sections]);
   const players = new Set(sections.flatMap((section) => section.rows.map((row) => row.playerId))).size;
   const loadedDates = dates.filter((date) => date.status !== "pendiente").length;
+  const modality = circuit.modality === "online" ? "Online" : circuit.modality === "hibrido" ? "Híbrido" : "Presencial";
+  const categoryGroups = groupSectionsByCategory(sections);
 
   return (
-    <main className="min-h-dvh bg-[#f4f1e8] pb-16 text-slate-950">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#102f28]/95 text-white backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 text-white hover:bg-white/10 hover:text-white">
-            <Link href="/rankings"><ArrowLeft className="size-4" /> Circuitos</Link>
+    <main className="min-h-dvh overflow-hidden bg-[#f4f0e5] text-[#14231f]">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0d2e27]/95 text-white backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 rounded-full text-white hover:bg-white/10 hover:text-white">
+            <Link href="/rankings"><ArrowLeft className="size-4" /> Torneos</Link>
           </Button>
-          <span className="truncate text-xs font-bold text-emerald-100">{circuit.shortName}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-xs font-black text-emerald-100">{circuit.shortName}</span>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white p-1"><Image src="/logoflash.png" alt="" width={32} height={32} className="size-full object-contain" /></span>
+          </div>
         </div>
       </header>
 
-      <section className="bg-[#102f28] px-4 pb-10 pt-8 text-white sm:px-6 sm:pb-14">
-        <div className="mx-auto max-w-5xl">
+      <section className="relative isolate bg-[#10392f] px-4 pb-24 pt-9 text-white sm:px-6 sm:pb-28 sm:pt-14">
+        <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_85%_20%,rgba(217,245,95,0.18),transparent_30%)]" />
+        <div className="absolute inset-0 -z-10 opacity-[0.045] [background-image:linear-gradient(45deg,#fff_25%,transparent_25%),linear-gradient(-45deg,#fff_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#fff_75%),linear-gradient(-45deg,transparent_75%,#fff_75%)] [background-position:0_0,0_20px,20px_-20px,-20px_0] [background-size:40px_40px]" />
+        <div className="absolute -bottom-20 -right-14 -z-10 select-none text-[16rem] leading-none text-white/[0.035] sm:text-[22rem]" aria-hidden="true">♞</div>
+        <div className="mx-auto max-w-6xl">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className={circuit.status === "finalizado" ? "bg-white/15 text-white" : "bg-[#d9f65f] text-[#102f28]"}>
-              {circuit.status === "finalizado" ? "Circuito finalizado" : "Circuito activo"}
+            <Badge className={circuit.status === "finalizado" ? "bg-white/10 text-white" : "bg-[#d9f55f] text-[#10392f]"}>
+              {circuit.status === "finalizado" ? <ShieldCheck className="size-3" /> : <CircleDot className="size-3" />}{circuit.status === "finalizado" ? "Circuito finalizado" : "En juego"}
             </Badge>
-            <span className="text-sm font-bold text-emerald-100">Temporada {circuit.season}</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-emerald-100">{circuit.categoryScheme === "impares" ? "Categorías impares" : "Categorías pares"}</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-emerald-100">{modality}</span>
           </div>
-          <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-5xl">{circuit.name}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-emerald-50 sm:text-base">{circuit.description}</p>
-          <p className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-emerald-100"><MapPin className="size-4" />{circuit.location}</p>
-          <div className="mt-7 grid grid-cols-3 gap-2 sm:max-w-xl sm:gap-3">
-            <Metric value={loadedDates} label="Fechas" icon={CalendarDays} />
-            <Metric value={players} label="Jugadores" icon={Users} />
-            <Metric value={schools.length} label="Colegios" icon={School} />
-          </div>
+          <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-[#d9f55f]">Temporada {circuit.season}</p>
+          <h1 className="mt-2 max-w-4xl text-4xl font-black leading-[0.98] tracking-[-0.05em] sm:text-6xl">{circuit.name}</h1>
+          <p className="mt-5 max-w-2xl text-sm font-medium leading-relaxed text-emerald-50/75 sm:text-base">{circuit.description}</p>
+          <p className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-100"><MapPin className="size-4 text-[#d9f55f]" />{circuit.location || "Paraguay"}</p>
         </div>
       </section>
 
-      <div className="mx-auto max-w-5xl space-y-9 px-4 py-8 sm:px-6 sm:py-10">
-        <section>
+      <section className="relative z-10 mx-auto -mt-14 max-w-6xl px-4 sm:px-6" aria-label="Resumen del circuito">
+        <div className="grid grid-cols-3 overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_20px_60px_rgba(17,51,43,0.12)]">
+          <Metric value={loadedDates} label="Fechas" icon={CalendarDays} />
+          <Metric value={players} label="Jugadores" icon={Users} />
+          <Metric value={schools.length} label="Colegios" icon={School} />
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-6xl space-y-12 px-4 py-12 sm:px-6 sm:py-16">
+        <section className="rounded-[1.75rem] border border-[#173b32]/10 bg-[#e9e3d5] p-3 sm:p-5">
           <div className="mb-3">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Búsqueda rápida</p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight">Encontrá a un jugador</h2>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#23705d]">Tu acceso directo</p>
+            <h2 className="mt-1 text-2xl font-black tracking-[-0.035em] sm:text-3xl">Encontrá a un jugador</h2>
           </div>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre del jugador o colegio" className="h-14 rounded-2xl border-slate-200 bg-white pl-12 pr-12 text-base shadow-sm" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre del jugador o colegio" className="h-14 rounded-2xl border-0 bg-white pl-12 pr-12 text-base shadow-none focus-visible:ring-[#287561]/30" />
             {query ? <button type="button" onClick={() => setQuery("")} aria-label="Limpiar búsqueda" className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100"><X className="size-4" /></button> : null}
           </div>
           {normalizedQuery ? (
@@ -94,21 +108,21 @@ export function PublicCircuitView({
         </section>
 
         <section>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Clasificación completa</p>
-          <h2 className="mt-1 text-2xl font-black tracking-tight">Resultados por categoría y rama</h2>
-          <p className="mt-2 text-sm text-slate-600">Abrí solamente la tarjeta que necesitás. Cada una muestra el acumulado y el detalle por fecha.</p>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#23705d]">Clasificación completa</p>
+          <h2 className="mt-1 text-3xl font-black tracking-[-0.04em]">Resultados por categoría</h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#64726c]">Elegí la categoría y rama. Después tocá un jugador para ver cómo sumó en cada fecha.</p>
           <div className="mt-5 space-y-3">
-            {sections.map((section, index) => (
-              <details key={section.id} open={index === 0} className="group overflow-hidden rounded-2xl border border-slate-900/10 bg-white shadow-sm">
+            {categoryGroups.map((group, index) => (
+              <details key={group.category.id} open={index === 0} className="group overflow-hidden rounded-3xl border border-[#173b32]/10 bg-white shadow-[0_10px_28px_rgba(17,51,43,0.06)]">
                 <summary className="flex min-h-20 cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden sm:p-5">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${section.branch.id === "femenino" ? "bg-rose-100 text-rose-700" : "bg-sky-100 text-sky-700"}`}><Trophy className="size-5" /></div>
-                    <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wide text-slate-500">Rama {section.branch.name}</p><h3 className="truncate text-lg font-black">{section.category.name}</h3><p className="text-xs font-semibold text-slate-500">{section.rows.length} jugadores</p></div>
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#e5efe9] text-[#1e6c57]"><Trophy className="size-5" /></div>
+                    <div className="min-w-0"><p className="text-xs font-black uppercase tracking-wide text-slate-500">Categoría</p><h3 className="truncate text-lg font-black">{group.category.name}</h3><p className="text-xs font-semibold text-slate-500">{group.sections.reduce((total, section) => total + section.rows.length, 0)} resultados · 2 ramas</p></div>
                   </div>
                   <ChevronDown className="size-5 shrink-0 text-slate-400 transition group-open:rotate-180" />
                 </summary>
-                <div className="border-t border-slate-100 bg-slate-50/60 p-2 sm:p-4">
-                  {section.rows.length ? <div className="space-y-2">{section.rows.map((row) => <RankingRow key={row.playerId} row={row} dates={dates} />)}</div> : <p className="p-5 text-center text-sm text-slate-500">Sin resultados cargados en esta división.</p>}
+                <div className="space-y-4 border-t border-slate-100 bg-slate-50/60 p-2 sm:p-4">
+                  {group.sections.map((section) => <section key={section.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white"><div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3"><div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Rama</p><h4 className="font-black">{section.branch.name}</h4></div><Badge className={section.branch.id === "femenino" ? "bg-rose-100 text-rose-700" : "bg-[#e5efe9] text-[#1e6c57]"}>{section.rows.length} jugadores</Badge></div>{section.rows.length ? <div className="space-y-2 bg-slate-50/60 p-2">{section.rows.map((row) => <RankingRow key={row.playerId} row={row} dates={dates} />)}</div> : <p className="p-5 text-center text-sm text-slate-500">Sin resultados cargados en esta rama.</p>}</section>)}
                 </div>
               </details>
             ))}
@@ -116,10 +130,10 @@ export function PublicCircuitView({
         </section>
 
         <section>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Acumulado institucional</p>
-          <h2 className="mt-1 text-2xl font-black tracking-tight">Ranking de colegios</h2>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#23705d]">Acumulado institucional</p>
+          <h2 className="mt-1 text-3xl font-black tracking-[-0.04em]">Ranking de colegios</h2>
           <div className="mt-5 space-y-2">{schools.map((row) => (
-            <div key={row.schoolId} className="flex items-center gap-3 rounded-2xl border border-slate-900/10 bg-white p-4">
+            <div key={row.schoolId} className="flex items-center gap-3 rounded-2xl border border-[#173b32]/10 bg-white p-4 shadow-[0_8px_24px_rgba(17,51,43,0.045)]">
               <RankMark rank={row.rank} />
               <div className="min-w-0 flex-1"><p className="truncate font-black">{row.schoolName}</p><p className="text-xs font-semibold text-slate-500">{row.playersWithPoints} jugadores · {row.datesWithPoints} fechas</p></div>
               <strong className="text-lg text-emerald-800">{row.totalPoints}<span className="ml-1 text-xs">pts</span></strong>
@@ -127,12 +141,23 @@ export function PublicCircuitView({
           ))}</div>
         </section>
       </div>
+      <footer className="bg-[#0d2e27] px-4 py-9 text-white sm:px-6"><div className="mx-auto flex max-w-6xl items-center justify-between gap-4"><div><p className="font-black">Circuitos de Ajedrez</p><p className="text-xs text-emerald-100/55">Cada partida cuenta.</p></div><Button asChild variant="ghost" size="sm" className="rounded-full text-white hover:bg-white/10 hover:text-white"><Link href="/rankings">Ver otros torneos <ArrowLeft className="size-4" /></Link></Button></div></footer>
     </main>
   );
 }
 
 function Metric({ value, label, icon: Icon }: { value: number; label: string; icon: typeof Users }) {
-  return <div className="rounded-2xl border border-white/15 bg-white/10 p-3 sm:p-4"><Icon className="mb-3 size-4 text-[#d9f65f]" /><strong className="block text-2xl font-black">{value}</strong><span className="text-xs font-bold text-emerald-100">{label}</span></div>;
+  return <div className="relative px-2 py-5 text-center after:absolute after:inset-y-4 after:right-0 after:w-px after:bg-[#173b32]/10 last:after:hidden sm:px-6 sm:py-7"><Icon className="mx-auto mb-2 size-4 text-[#23705d] sm:size-5" /><strong className="block text-xl font-black sm:text-3xl">{value.toLocaleString("es-PY")}</strong><span className="block text-[10px] font-black uppercase tracking-[0.1em] text-[#6f7d77] sm:text-xs">{label}</span></div>;
+}
+
+function groupSectionsByCategory(sections: RankingSection[]) {
+  const groups = new Map<string, { category: Category; sections: RankingSection[] }>();
+  for (const section of sections) {
+    const group = groups.get(section.category.id);
+    if (group) group.sections.push(section);
+    else groups.set(section.category.id, { category: section.category, sections: [section] });
+  }
+  return [...groups.values()];
 }
 
 function PlayerResult({ row, section, dates }: { row: IndividualRankingRow; section: RankingSection; dates: CircuitDate[] }) {
